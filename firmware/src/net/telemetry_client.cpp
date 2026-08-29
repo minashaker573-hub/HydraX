@@ -213,7 +213,11 @@ int TelemetryClient::postJson(const char* path, const char* body) {
     http.addHeader("Content-Type", "application/json");
     if (deviceKey_ != nullptr) http.addHeader("X-Device-Key", deviceKey_);
 
-    const int status = http.POST(reinterpret_cast<const uint8_t*>(body),
+    // HTTPClient::POST takes a non-const uint8_t* even though it only reads the
+    // payload; the cast works around that missing const in the Arduino API. The
+    // pointer-and-length overload is used instead of the String one so a ~1.2 KB
+    // telemetry body is not copied onto the heap on every publish.
+    const int status = http.POST(reinterpret_cast<uint8_t*>(const_cast<char*>(body)),
                                  static_cast<size_t>(strlen(body)));
     http.end();
 

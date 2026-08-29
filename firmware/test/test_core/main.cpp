@@ -179,6 +179,22 @@ bool driveToIrrigating(Rig& rig, uint8_t zoneId) {
     return rig.state() == IrrigationState::kIrrigating && rig.controller.activeZone() == zoneId;
 }
 
+// Runs until the controller settles back to IDLE, bounded so a stuck machine
+// fails the test rather than hanging it. Expressed in ticks rather than a
+// fixed wall time so it holds under both the field and bench timing profiles.
+bool runUntilIdle(Rig& rig, uint32_t limitMs) {
+    for (uint32_t elapsedMs = 0; elapsedMs < limitMs; elapsedMs += config::kControlIntervalMs) {
+        rig.run(config::kControlIntervalMs);
+        if (rig.state() == IrrigationState::kIdle) return true;
+    }
+    return false;
+}
+
+// A duration comfortably inside the maximum runtime, for tests that assert
+// irrigation is still going. Deriving it from the configured limit keeps these
+// tests valid when the bench timing profile compresses that limit.
+constexpr uint32_t midRunDurationMs() { return config::kMaxIrrigationMs / 2; }
+
 // ---------------------------------------------------------------------------
 // SENSOR LAYER
 // ---------------------------------------------------------------------------
@@ -459,7 +475,7 @@ void test_irrigation_continues_until_stop_threshold() {
     // Soil rises past the START threshold but not to the STOP threshold.
     // Irrigation must continue - that is the whole point of the band.
     rig.setZonePercent(0, 45.0f);
-    rig.run(20u * 1000u);
+    rig.run(midRunDurationMs());
     CHECK(rig.state() == IrrigationState::kIrrigating);
     CHECK(rig.pump.isOn());
 }
@@ -500,8 +516,7 @@ void test_cooldown_blocks_immediate_restart() {
     CHECK(driveToIrrigating(rig, 0));
 
     rig.setZonePercent(0, 100.0f);
-    rig.run(90u * 1000u);
-    CHECK(rig.state() == IrrigationState::kIdle);
+    CHECK(runUntilIdle(rig, config::kMaxIrrigationMs));
     const int runs = rig.countEvents(EventType::kIrrigationStarted);
 
     // Soil goes bone dry again immediately. Without a cooldown this is exactly
@@ -659,7 +674,7 @@ void test_zone_runs_degraded_on_a_single_healthy_sensor() {
     // One probe of the active zone dies mid-run. Irrigation continues on the
     // survivor rather than aborting a legitimate cycle.
     rig.analog.setRaw(1, -1);
-    rig.run(20u * 1000u);
+    rig.run(midRunDurationMs());
 
     CHECK(rig.state() == IrrigationState::kIrrigating);
     CHECK(rig.pump.isOn());

@@ -136,6 +136,28 @@ constexpr float kMinHysteresisBand = 5.0f;
 // ---------------------------------------------------------------------------
 // TIMING / SAFETY LIMITS
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// BENCH TIMING PROFILE
+// ---------------------------------------------------------------------------
+// Field timings make a full irrigation cycle take 15+ minutes to observe, which
+// is impractical for bench bring-up. Building with -D HYDRAX_BENCH_TIMING
+// compresses them so a complete start/stop/timeout/cooldown cycle can be
+// watched in about a minute.
+//
+// This changes SAFETY LIMITS. It is opt-in, never the default, and the
+// firmware logs a loud warning at boot when it is active. Never deploy an
+// image built with this flag.
+#ifdef HYDRAX_BENCH_TIMING
+constexpr bool kBenchTiming = true;
+
+constexpr uint32_t kMaxIrrigationMs   = 20u * 1000u;  // 20 seconds
+constexpr uint32_t kMinIrrigationMs   = 3u * 1000u;   // 3 seconds
+constexpr uint32_t kZoneCooldownMs    = 15u * 1000u;  // 15 seconds
+constexpr uint32_t kTimeoutLockoutMs  = 30u * 1000u;  // 30 seconds
+
+#else
+constexpr bool kBenchTiming = false;
+
 // Hard ceiling on a single irrigation run. Hitting it is a fault, not a normal
 // stop: the pump is cut and the zone enters TIMEOUT.
 constexpr uint32_t kMaxIrrigationMs = 10u * 60u * 1000u;  // 10 minutes
@@ -150,6 +172,7 @@ constexpr uint32_t kZoneCooldownMs = 5u * 60u * 1000u;  // 5 minutes
 
 // Rest imposed after a TIMEOUT before the zone may be retried.
 constexpr uint32_t kTimeoutLockoutMs = 30u * 60u * 1000u;  // 30 minutes
+#endif
 
 // Valve is opened BEFORE the pump starts, and closed AFTER it stops, so the
 // pump never runs against a closed head.

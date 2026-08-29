@@ -90,6 +90,13 @@ void setup() {
     HX_LOG_INFO("boot", "HYDRAX %s starting (device %s)", config::kFirmwareVersion,
                 config::kDeviceId);
 
+    if (config::kBenchTiming) {
+        HX_LOG_WARN("boot", "*** BENCH TIMING BUILD - safety limits are compressed ***");
+        HX_LOG_WARN("boot", "max run %lus, cooldown %lus. DO NOT DEPLOY THIS IMAGE.",
+                    static_cast<unsigned long>(config::kMaxIrrigationMs / 1000),
+                    static_cast<unsigned long>(config::kZoneCooldownMs / 1000));
+    }
+
     // 1. ACTUATORS FIRST, DE-ENERGIZED. Nothing else may run before this.
     g_pump.begin(config::kPumpPin, config::kPumpActiveLow, "pump");
     for (uint8_t z = 0; z < config::kZoneCount; ++z) {
