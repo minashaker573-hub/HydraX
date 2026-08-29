@@ -1,0 +1,32 @@
+# --- secrets: never commit credentials ---
+firmware/src/config/secrets.h
+.env
+.env.*
+!.env.example
+
+# --- firmware build ---
+firmware/.pio/
+firmware/.pio-build/
+firmware/build/
+*.elf
+*.bin
+*.o
+*.exe
+firmware/test/build/
+
+# --- backend ---
+node_modules/
+backend/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# --- editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- logs ---
+*.log
