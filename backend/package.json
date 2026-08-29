@@ -1,0 +1,21 @@
+{
+  "name": "hydrax-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HYDRAX / SmartFarm Guardian - Phase 1 telemetry ingestion, storage and dashboard API",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "dev": "node --watch src/server.ts",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "mock-device": "node tools/mock-device.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.0"
+  }
+}
