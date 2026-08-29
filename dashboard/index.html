@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HYDRAX — SmartFarm Guardian</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💧</text></svg>"
+    />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">◆</span>
+        <div>
+          <h1>HYDRAX</h1>
+          <p class="brand-sub">SmartFarm Guardian — Phase 1</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span id="refresh-state" class="refresh" aria-live="polite">connecting…</span>
+      </div>
+    </header>
+
+    <main id="content">
+      <p class="placeholder">Loading system state…</p>
+    </main>
+
+    <footer class="footer">
+      <p>
+        Irrigation decisions are made locally on the controller. This dashboard is for
+        monitoring only — it is never in the control path.
+      </p>
+    </footer>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

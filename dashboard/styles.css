@@ -1,0 +1,442 @@
+/* HYDRAX dashboard — Phase 1
+   Deliberately restrained: real state, legible at a glance, no decorative
+   charts standing in for data we do not have. */
+
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f0f2f5;
+  --border: #dfe3e8;
+  --text: #17202a;
+  --text-dim: #5c6672;
+  --accent: #0f6fd1;
+  --ok: #1a7f4b;
+  --ok-bg: #e5f4ec;
+  --warn: #9a6206;
+  --warn-bg: #fdf1dc;
+  --crit: #b3261e;
+  --crit-bg: #fdeceb;
+  --idle: #5c6672;
+  --water: #0f6fd1;
+  --water-bg: #e6f0fb;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #10141a;
+    --surface: #171d26;
+    --surface-2: #1e2531;
+    --border: #2b3542;
+    --text: #e6eaf0;
+    --text-dim: #9aa5b4;
+    --accent: #5aa9f5;
+    --ok: #52c98a;
+    --ok-bg: #14301f;
+    --warn: #e0a84a;
+    --warn-bg: #33270f;
+    --crit: #f2857c;
+    --crit-bg: #351815;
+    --idle: #9aa5b4;
+    --water: #5aa9f5;
+    --water-bg: #12263c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- top bar ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-mark {
+  color: var(--accent);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+}
+
+.brand-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.refresh {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.refresh.stale {
+  color: var(--crit);
+  font-weight: 600;
+}
+
+/* ---------- layout ---------- */
+main {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.placeholder {
+  color: var(--text-dim);
+  text-align: center;
+  padding: 48px 0;
+}
+
+.device {
+  margin-bottom: 32px;
+}
+
+.device-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.device-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.device-meta {
+  color: var(--text-dim);
+  font-size: 12px;
+  margin-left: auto;
+  text-align: right;
+}
+
+/* ---------- badges ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.badge-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.badge-warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.badge-crit {
+  background: var(--crit-bg);
+  color: var(--crit);
+}
+.badge-idle {
+  background: var(--surface-2);
+  color: var(--idle);
+}
+.badge-water {
+  background: var(--water-bg);
+  color: var(--water);
+}
+
+.badge-sim {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: currentColor;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+/* ---------- cards ---------- */
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+.card h3 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.card-zone.active {
+  border-color: var(--water);
+  box-shadow: 0 0 0 1px var(--water), var(--shadow);
+}
+
+/* ---------- status rows ---------- */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.row + .row {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.row-label {
+  color: var(--text-dim);
+}
+
+.row-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.row-value.invalid {
+  color: var(--crit);
+  font-weight: 600;
+}
+
+/* ---------- moisture ---------- */
+.moisture-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.moisture-value {
+  font-size: 34px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.moisture-unit {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.moisture-caption {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: 0 0 12px;
+}
+
+/* Linear gauge showing the measured value against the configured band. */
+.gauge {
+  position: relative;
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  margin: 10px 0 6px;
+  overflow: hidden;
+}
+
+.gauge-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--water);
+  border-radius: 999px;
+}
+
+.gauge-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(127, 127, 127, 0.28);
+}
+
+.gauge-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- alerts ---------- */
+.alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.alert {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border: 1px solid;
+  font-size: 14px;
+}
+
+.alert-critical {
+  background: var(--crit-bg);
+  border-color: var(--crit);
+  color: var(--crit);
+}
+
+.alert-warning {
+  background: var(--warn-bg);
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.alert-body {
+  color: var(--text);
+}
+
+.alert strong {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.alert-time {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* ---------- events ---------- */
+.events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.event {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.event + .event {
+  border-top: 1px solid var(--border);
+}
+
+.event-type {
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.event-detail {
+  color: var(--text-dim);
+  flex: 1;
+  min-width: 0;
+}
+
+.event-time {
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+/* ---------- notices ---------- */
+.notice {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  border: 1px dashed var(--warn);
+  background: var(--warn-bg);
+  color: var(--warn);
+  margin-bottom: 16px;
+}
+
+.footer {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px 32px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  main,
+  .footer {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .topbar {
+    padding: 12px 14px;
+  }
+  .device-meta {
+    margin-left: 0;
+    text-align: left;
+    width: 100%;
+  }
+}
