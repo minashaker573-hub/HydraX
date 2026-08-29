@@ -12,7 +12,8 @@
     "dev": "node --watch src/server.ts",
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "mock-device": "node tools/mock-device.ts"
+    "mock-device": "node tools/mock-device.ts",
+    "check:dashboard": "node ../dashboard/check.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

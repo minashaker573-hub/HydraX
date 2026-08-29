@@ -6,6 +6,7 @@ Two suites, both runnable with no hardware attached.
 | --- | --- | --- |
 | Firmware core | Sensors, calibration, hysteresis, state machine, safety, Wi-Fi policy, telemetry serialization | `./hydrax_tests` |
 | Backend | Validation, HTTP API, persistence, alert rules, routing | `npm test` |
+| Dashboard | Module parsing, import resolution, entry points, innerHTML ban | `npm run check:dashboard` |
 
 ---
 
@@ -93,6 +94,7 @@ cd backend
 npm install
 npm test
 npm run typecheck
+npm run check:dashboard
 ```
 
 ### Coverage
@@ -152,10 +154,10 @@ logic exists once, in the firmware, and is covered by the firmware suite.
 
 Verified honestly — these are **not** covered by automated tests:
 
-1. **On-target firmware execution.** The core logic is tested on the host. The
-   ESP32-specific files (`hal/esp32_*`, `net/telemetry_client.cpp`, `main.cpp`)
-   need the Arduino toolchain and have not been compiled or run here — they
-   require `pio run -e esp32dev` and a board.
+1. **On-target firmware execution.** The ESP32-specific files
+   (`hal/esp32_*`, `net/telemetry_client.cpp`, `main.cpp`) now **compile** —
+   `pio run -e esp32dev` passes, see docs/HARDWARE_BRINGUP.md. They have never
+   been **run**: that needs a board.
 2. **Real ADC behaviour.** Probe noise, temperature drift and supply ripple can
    only be characterized against physical sensors.
 3. **Real HTTP uplink.** `TelemetryClient`'s FreeRTOS task and `HTTPClient`
@@ -166,9 +168,12 @@ Verified honestly — these are **not** covered by automated tests:
    starting values.
 5. **Dashboard read endpoints are unauthenticated.** Phase 1 assumes a trusted
    LAN. Do not expose the backend to the Internet as-is.
-6. **No concurrency/load testing.** SQLite in WAL mode with a handful of devices
+6. **Dashboard verified against the mock device only.** Its checks cover parsing,
+   imports and safe rendering, not visual regression, and no real sensor data
+   has ever flowed through the UI.
+7. **No concurrency/load testing.** SQLite in WAL mode with a handful of devices
    is comfortable, but this has not been measured.
-7. **Backend runs over plain HTTP.** TLS termination is left to a reverse proxy.
+8. **Backend runs over plain HTTP.** TLS termination is left to a reverse proxy.
 
 ---
 

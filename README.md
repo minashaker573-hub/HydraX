@@ -32,7 +32,9 @@ soil moisture sensors (4)
 - Hysteresis-based irrigation with minimum/maximum runtime and per-zone cooldown
 - Explicit state machine, fail-safe on sensor, actuator and timeout faults
 - Telemetry buffered while offline and flushed on reconnect
-- Backend ingestion, persistence, alerting and a monitoring dashboard
+- Backend ingestion, persistence, alerting, and a seven-section monitoring dashboard
+  (Overview, Smart Irrigation, Pump Health, Water Network, Safety Center,
+  Alerts & Events, Device)
 
 Explicitly **not** in this phase: predictive maintenance, failure prediction,
 leak localization, mobile app, multi-farm SaaS. See
@@ -53,7 +55,7 @@ backend/           Node 24 + TypeScript, zero runtime dependencies
   src/             HTTP API, SQLite persistence, validation, alert rules
   test/            HTTP and domain tests
   tools/           mock device fixture
-dashboard/         static HTML/CSS/JS monitoring UI (no build step)
+dashboard/         static HTML/CSS/JS monitoring UI (no build step, ES modules)
 docs/              architecture, state machine, telemetry, hardware, testing
 ```
 
@@ -130,10 +132,11 @@ g++ -std=c++17 -I src -o hydrax_tests test/test_core/main.cpp src/core/*.cpp
 # or under PlatformIO
 pio test -e native
 
-# backend
+# backend + dashboard
 cd backend
 npm test
 npm run typecheck
+npm run check:dashboard
 ```
 
 Full details, including what is and is not covered, in
@@ -146,6 +149,7 @@ Full details, including what is and is not covered, in
 | Document | Contents |
 | --- | --- |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, data flow, design decisions, offline behaviour |
+| [DASHBOARD.md](docs/DASHBOARD.md) | Dashboard sections, API/data mapping, demo mode, error states |
 | [STATE_MACHINE.md](docs/STATE_MACHINE.md) | Irrigation states and the full transition table |
 | [TELEMETRY.md](docs/TELEMETRY.md) | Payload schema, API endpoints, time handling |
 | [CONFIGURATION.md](docs/CONFIGURATION.md) | Every tunable, firmware and backend |
