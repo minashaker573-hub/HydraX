@@ -13,7 +13,9 @@
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "mock-device": "node tools/mock-device.ts",
-    "check:dashboard": "node ../dashboard/check.mjs"
+    "check:dashboard": "node ../dashboard/check.mjs",
+    "check:website": "node ../website/check.mjs",
+    "check": "npm run check:dashboard && npm run check:website"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

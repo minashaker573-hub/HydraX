@@ -154,6 +154,7 @@ Full details, including what is and is not covered, in
 | --- | --- |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, data flow, design decisions, offline behaviour |
 | [DASHBOARD.md](docs/DASHBOARD.md) | Dashboard sections, API/data mapping, demo mode, error states |
+| [WEBSITE.md](docs/WEBSITE.md) | Public site structure, design language, and the honesty guard |
 | [STATE_MACHINE.md](docs/STATE_MACHINE.md) | Irrigation states and the full transition table |
 | [TELEMETRY.md](docs/TELEMETRY.md) | Payload schema, API endpoints, time handling |
 | [CONFIGURATION.md](docs/CONFIGURATION.md) | Every tunable, firmware and backend |
