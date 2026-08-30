@@ -23,120 +23,26 @@ import {
   type TelemetryPayload,
   type ZoneReading,
 } from './types.ts';
+import {
+  Errors,
+  isRecord,
+  oneOf,
+  optionalPercent,
+  requireBoolean,
+  requireInteger,
+  requireRecord,
+  requireString,
+  sanitizeText,
+  type ValidationResult,
+} from './validators.ts';
 
-export type ValidationResult<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly errors: string[] };
+// Re-exported so existing importers of validate.ts keep working.
+export type { ValidationResult };
+
 
 const DEVICE_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
 const ZONE_KEY_PATTERN = /^zone_(\d+)$/;
 const MAX_DETAIL_LENGTH = 200;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-class Errors {
-  readonly list: string[] = [];
-  add(message: string): void {
-    this.list.push(message);
-  }
-  get ok(): boolean {
-    return this.list.length === 0;
-  }
-}
-
-function requireRecord(value: unknown, path: string, errors: Errors): Record<string, unknown> {
-  if (!isRecord(value)) {
-    errors.add(`${path} must be an object`);
-    return {};
-  }
-  return value;
-}
-
-function requireString(
-  value: unknown,
-  path: string,
-  errors: Errors,
-  maxLength = 128,
-): string | null {
-  if (typeof value !== 'string') {
-    errors.add(`${path} must be a string`);
-    return null;
-  }
-  if (value.length > maxLength) {
-    errors.add(`${path} must be at most ${maxLength} characters`);
-    return null;
-  }
-  return value;
-}
-
-function requireBoolean(value: unknown, path: string, errors: Errors): boolean {
-  if (typeof value !== 'boolean') {
-    errors.add(`${path} must be a boolean`);
-    return false;
-  }
-  return value;
-}
-
-function requireInteger(
-  value: unknown,
-  path: string,
-  errors: Errors,
-  min: number,
-  max: number,
-): number {
-  if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value)) {
-    errors.add(`${path} must be an integer`);
-    return min;
-  }
-  if (value < min || value > max) {
-    errors.add(`${path} must be between ${min} and ${max}`);
-    return min;
-  }
-  return value;
-}
-
-/** A percentage that may legitimately be absent. */
-function optionalPercent(value: unknown, path: string, errors: Errors): number | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    errors.add(`${path} must be a number or null`);
-    return null;
-  }
-  if (value < 0 || value > 100) {
-    errors.add(`${path} must be between 0 and 100`);
-    return null;
-  }
-  return value;
-}
-
-function oneOf<T extends string>(
-  value: unknown,
-  allowed: readonly T[],
-  path: string,
-  errors: Errors,
-): T {
-  if (typeof value !== 'string' || !allowed.includes(value as T)) {
-    errors.add(`${path} must be one of: ${allowed.join(', ')}`);
-    return allowed[0]!;
-  }
-  return value as T;
-}
-
-/**
- * Strips control characters from free text before it is stored and later
- * rendered. The dashboard escapes on output too; this keeps the stored data
- * clean as well.
- */
-function sanitizeText(value: string): string {
-  let out = '';
-  for (const ch of value) {
-    const code = ch.codePointAt(0) ?? 0;
-    out += code < 0x20 || code === 0x7f ? ' ' : ch;
-  }
-  return out.trim();
-}
 
 // ---------------------------------------------------------------------------
 // telemetry

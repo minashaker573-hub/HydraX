@@ -87,3 +87,44 @@ export interface EventPayload {
   durationMs: number | null;
   detail: string | null;
 }
+
+/* ===========================================================================
+   Customer quote requests
+   ---------------------------------------------------------------------------
+   These describe what a prospective customer ASKED FOR. A requested capability
+   is an expression of interest, not a statement that the capability ships
+   today — pump, water-network and safety monitoring all still need hardware
+   that does not exist yet.
+   =========================================================================== */
+
+export const IRRIGATION_TYPES = ['DRIP', 'SPRINKLER', 'OTHER'] as const;
+export type IrrigationType = (typeof IRRIGATION_TYPES)[number];
+
+export const CAPABILITIES = [
+  'SMART_IRRIGATION',
+  'PUMP_MONITORING',
+  'WATER_NETWORK_MONITORING',
+  'SAFETY_MONITORING',
+] as const;
+export type Capability = (typeof CAPABILITIES)[number];
+
+export const REQUEST_STATUSES = ['NEW', 'CONTACTED', 'QUOTED', 'CLOSED'] as const;
+export type RequestStatus = (typeof REQUEST_STATUSES)[number];
+
+/** Upper bound on zones accepted on a request form. */
+export const MAX_REQUEST_ZONES = 64;
+
+export interface QuoteRequestInput {
+  // farm
+  farmSize: string;
+  farmLocation: string;
+  irrigationType: IrrigationType;
+  zoneCount: number;
+  // requirements
+  capabilities: Capability[];
+  // customer
+  fullName: string;
+  phone: string;
+  email: string | null;
+  notes: string | null;
+}

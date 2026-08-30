@@ -41,6 +41,10 @@ export class Router {
   post(pattern: string, handler: Handler): this {
     return this.add('POST', pattern, handler);
   }
+  patch(pattern: string, handler: Handler): this {
+    return this.add('PATCH', pattern, handler);
+  }
+
   put(pattern: string, handler: Handler): this {
     return this.add('PUT', pattern, handler);
   }

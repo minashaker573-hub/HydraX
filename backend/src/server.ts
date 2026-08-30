@@ -28,6 +28,7 @@ function main(): void {
       dbPath: join(BACKEND_ROOT, 'data', 'hydrax.db'),
       dashboardDir: join(PROJECT_ROOT, 'dashboard'),
       websiteDir: join(PROJECT_ROOT, 'website'),
+      adminDir: join(PROJECT_ROOT, 'admin'),
     });
   } catch (error) {
     if (error instanceof ConfigError) {
@@ -83,6 +84,7 @@ function main(): void {
     log.info('server', `HYDRAX backend listening on http://${config.host}:${config.port}`);
     log.info('server', `Website   / -> ${config.websiteDir}`);
     log.info('server', `Dashboard /dashboard -> ${config.dashboardDir}`);
+    log.info('server', `Admin     /admin -> ${config.adminDir}`);
   });
 
   const shutdown = (signal: string): void => {

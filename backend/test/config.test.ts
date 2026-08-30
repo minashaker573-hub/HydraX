@@ -9,7 +9,12 @@ import assert from 'node:assert/strict';
 
 import { ConfigError, loadConfig } from '../src/config.ts';
 
-const DEFAULTS = { dbPath: ':memory:', dashboardDir: '/tmp/dash', websiteDir: '/tmp/site' };
+const DEFAULTS = {
+  dbPath: ':memory:',
+  dashboardDir: '/tmp/dash',
+  websiteDir: '/tmp/site',
+  adminDir: '/tmp/admin',
+};
 
 function load(env: Record<string, string | undefined>) {
   return loadConfig(env as NodeJS.ProcessEnv, DEFAULTS);
@@ -79,6 +84,7 @@ describe('numeric settings', () => {
     assert.equal(config.host, '0.0.0.0');
     assert.equal(config.offlineTimeoutMs, 60_000);
     assert.equal(config.retentionDays, 30);
+    assert.equal(config.requestRateMax, 10);
   });
 
   test('rejects a non-numeric or negative value rather than silently defaulting', () => {

@@ -161,6 +161,79 @@ function findUnmeasuredClaims(html) {
   return [...new Set(hits)];
 }
 
+/* --- 7. the request flow -------------------------------------------------- */
+// Every CTA on the site points at /request. If that page or any of its fields
+// disappears, the whole commercial path breaks silently.
+console.log('\nrequest flow:');
+{
+  const requestPath = join(HERE, 'request.html');
+  if (!existsSync(requestPath)) {
+    fail('request.html is missing, but every CTA on the site links to /request');
+  } else {
+    const requestHtml = await readFile(requestPath, 'utf8');
+    const indexHtml = await readFile(join(HERE, 'index.html'), 'utf8');
+
+    if (indexHtml.includes('href="/request"')) ok('index.html links to /request');
+    else fail('index.html has no link to /request');
+
+    const FIELDS = [
+      ['farm_size', 'farm size'],
+      ['farm_location', 'farm location'],
+      ['irrigation_type', 'irrigation type'],
+      ['zone_count', 'zone count'],
+      ['capabilities', 'capabilities'],
+      ['full_name', 'full name'],
+      ['phone', 'phone'],
+      ['email', 'email'],
+      ['notes', 'notes'],
+    ];
+    const missing = FIELDS.filter(([name]) => !requestHtml.includes(`name="${name}"`));
+    if (missing.length > 0) {
+      for (const [, label] of missing) fail(`request.html is missing the ${label} field`);
+    } else {
+      ok(`all ${FIELDS.length} form fields present`);
+    }
+
+    if (/\srequired\b/.test(requestHtml)) ok('required-field validation declared');
+    else fail('request.html declares no required fields');
+
+    if (requestHtml.includes('data-error-for=')) ok('per-field error slots present');
+    else fail('request.html has no per-field error slots');
+
+    if (requestHtml.includes('id="confirmation"') && requestHtml.includes('id="reference-value"')) {
+      ok('confirmation state with a request ID present');
+    } else {
+      fail('request.html has no confirmation state');
+    }
+
+    if (requestHtml.includes('Request submitted successfully')) ok('confirmation message present');
+    else fail('request.html is missing the confirmation message');
+  }
+}
+
+/* --- 8. commercial language ----------------------------------------------- */
+// No payment system exists and pricing is not finalised, so neither may be
+// implied anywhere on the public site.
+console.log('\ncommercial language:');
+{
+  const PURCHASE = /\b(?:buy now|add to cart|checkout|proceed to payment|order now)\b/i;
+  const MONEY = /[$€£]\s?\d|\b\d+\s?(?:USD|EGP|EUR|GBP)\b/i;
+
+  let clean = true;
+  for (const page of pages) {
+    const text = (await readFile(join(HERE, page), 'utf8')).replace(/<[^>]+>/g, ' ');
+    if (PURCHASE.test(text)) {
+      fail(`${page} uses purchase language, but no payment system exists`);
+      clean = false;
+    }
+    if (MONEY.test(text)) {
+      fail(`${page} shows a price, but pricing is not finalised`);
+      clean = false;
+    }
+  }
+  if (clean) ok('no purchase language and no prices');
+}
+
 console.log('');
 if (failures > 0) {
   console.error(`${failures} check(s) failed`);

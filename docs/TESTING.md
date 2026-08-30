@@ -7,7 +7,8 @@ Two suites, both runnable with no hardware attached.
 | Firmware core | Sensors, calibration, hysteresis, state machine, safety, Wi-Fi policy, telemetry serialization | `./hydrax_tests` |
 | Backend | Validation, HTTP API, persistence, alert rules, routing | `npm test` |
 | Dashboard | Module parsing, import resolution, entry points, innerHTML ban | `npm run check:dashboard` |
-| Website | Parsing, assets, anchors, CSP compatibility, unmeasured-claim guard | `npm run check:website` |
+| Website | Parsing, assets, anchors, CSP compatibility, unmeasured-claim guard, request flow | `npm run check:website` |
+| Admin console | Parsing, mount prefix, safe rendering, credential handling | `npm run check:admin` |
 
 ---
 
@@ -101,6 +102,7 @@ npm test
 npm run typecheck
 npm run check:dashboard
 npm run check:website
+npm run check:admin
 ```
 
 ### Coverage

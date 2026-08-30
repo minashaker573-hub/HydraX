@@ -106,3 +106,46 @@ CREATE TABLE IF NOT EXISTS zone_config (
     updated_at    TEXT NOT NULL,
     PRIMARY KEY (device_id, zone)
 );
+
+-- ---------------------------------------------------------------------------
+-- Customer quote requests
+-- ---------------------------------------------------------------------------
+-- Submitted from the public website. This is the only table fed by an
+-- unauthenticated endpoint, and the only one holding personal data, so it is
+-- read back exclusively through operator-authenticated routes.
+--
+-- `reference` is the customer-facing identifier (HYX-XXXXXX). It is UNIQUE and
+-- generated with a collision retry, so it can be quoted over the phone.
+CREATE TABLE IF NOT EXISTS quote_requests (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    reference       TEXT NOT NULL UNIQUE,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'NEW',
+
+    -- farm
+    farm_size       TEXT NOT NULL,
+    farm_location   TEXT NOT NULL,
+    irrigation_type TEXT NOT NULL,
+    zone_count      INTEGER NOT NULL,
+
+    -- customer
+    full_name       TEXT NOT NULL,
+    phone           TEXT NOT NULL,
+    email           TEXT,
+    notes           TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_requests_created
+    ON quote_requests (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_requests_status
+    ON quote_requests (status, created_at DESC);
+
+-- Requested capabilities, normalized rather than stored as a blob so they can
+-- be counted and filtered. A row here means the customer expressed interest —
+-- not that the capability ships today.
+CREATE TABLE IF NOT EXISTS quote_request_capabilities (
+    request_id INTEGER NOT NULL REFERENCES quote_requests(id) ON DELETE CASCADE,
+    capability TEXT NOT NULL,
+    PRIMARY KEY (request_id, capability)
+);

@@ -164,6 +164,10 @@ LAN. See [known limitations](TESTING.md#known-gaps).
 | `GET` | `/api/v1/alerts?active=` | Alerts (active by default) |
 | `POST` | `/api/v1/alerts/:id/resolve` | Manually resolve an alert *(operator auth)* |
 | `GET` | `/api/v1/dashboard?events=` | Everything the dashboard renders, in one call |
+| `POST` | `/api/v1/requests` | Submit a customer quote request *(public)* |
+| `GET` | `/api/v1/requests` | List quote requests *(operator auth)* |
+| `GET` | `/api/v1/requests/:reference` | One quote request *(operator auth)* |
+| `PATCH` | `/api/v1/requests/:reference/status` | Update request status *(operator auth)* |
 
 Responses cap `limit` at 500. Request bodies are capped at 64 KB and refused
 with **413** while streaming, not after buffering.

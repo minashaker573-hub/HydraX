@@ -27,6 +27,12 @@ export interface Config {
   readonly dashboardDir: string;
   /** Directory served as the public website, mounted at /. */
   readonly websiteDir: string;
+  /** Directory served as the operator console, mounted under /admin. */
+  readonly adminDir: string;
+  /** Max public quote submissions per source per window. */
+  readonly requestRateMax: number;
+  /** Rate limit window for public quote submissions, in ms. */
+  readonly requestRateWindowMs: number;
 }
 
 export class ConfigError extends Error {}
@@ -43,7 +49,7 @@ function intFromEnv(env: NodeJS.ProcessEnv, name: string, fallback: number): num
 
 export function loadConfig(
   env: NodeJS.ProcessEnv = process.env,
-  defaults: { dbPath: string; dashboardDir: string; websiteDir: string },
+  defaults: { dbPath: string; dashboardDir: string; websiteDir: string; adminDir: string },
 ): Config {
   const deviceKey = env.HYDRAX_DEVICE_KEY?.trim() ?? '';
   const adminKey = env.HYDRAX_ADMIN_KEY?.trim() ?? '';
@@ -88,5 +94,8 @@ export function loadConfig(
     retentionDays: intFromEnv(env, 'HYDRAX_RETENTION_DAYS', 30),
     dashboardDir: env.HYDRAX_DASHBOARD_DIR ?? defaults.dashboardDir,
     websiteDir: env.HYDRAX_WEBSITE_DIR ?? defaults.websiteDir,
+    adminDir: env.HYDRAX_ADMIN_DIR ?? defaults.adminDir,
+    requestRateMax: intFromEnv(env, 'HYDRAX_REQUEST_RATE_MAX', 10),
+    requestRateWindowMs: intFromEnv(env, 'HYDRAX_REQUEST_RATE_WINDOW_MS', 60 * 60 * 1000),
   };
 }

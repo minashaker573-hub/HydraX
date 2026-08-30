@@ -73,6 +73,9 @@ All environment variables. `src/config.ts` is the only module that reads
 | `HYDRAX_DB_PATH` | `backend/data/hydrax.db` | SQLite file |
 | `HYDRAX_DASHBOARD_DIR` | `dashboard/` | Dashboard, mounted at `/dashboard` |
 | `HYDRAX_WEBSITE_DIR` | `website/` | Public website, mounted at `/` |
+| `HYDRAX_ADMIN_DIR` | `admin/` | Operator console, mounted at `/admin` |
+| `HYDRAX_REQUEST_RATE_MAX` | `10` | Public quote submissions allowed per source per window |
+| `HYDRAX_REQUEST_RATE_WINDOW_MS` | `3600000` | Rate limit window for quote submissions |
 | `HYDRAX_OFFLINE_TIMEOUT_MS` | `60000` | Silence before a device is offline |
 | `HYDRAX_OFFLINE_SWEEP_MS` | `15000` | Offline check interval |
 | `HYDRAX_RETENTION_DAYS` | `30` | Telemetry retention; `0` disables pruning |
@@ -89,7 +92,7 @@ server refuses to start if they are set to the same value.
 | Role | Header | Guards |
 | --- | --- | --- |
 | Device | `X-Device-Key` | `POST /api/v1/telemetry`, `POST /api/v1/events` |
-| Operator | `X-Admin-Key` | `PUT /api/v1/devices/:id/config`, `POST /api/v1/alerts/:id/resolve` |
+| Operator | `X-Admin-Key` | `PUT /api/v1/devices/:id/config`, `POST /api/v1/alerts/:id/resolve`, all `/api/v1/requests` reads and updates |
 
 Neither affects the control path: the firmware never calls an operator endpoint,
 and irrigation continues whether or not any of these checks pass.

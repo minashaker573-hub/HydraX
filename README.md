@@ -56,7 +56,8 @@ backend/           Node 24 + TypeScript, zero runtime dependencies
   test/            HTTP and domain tests
   tools/           mock device fixture
 dashboard/         static HTML/CSS/JS monitoring UI, served at /dashboard
-website/           public product website, served at /
+website/           public product website + quote request form, served at /
+admin/             operator console for quote requests, served at /admin
 docs/              architecture, state machine, telemetry, hardware, testing
 ```
 
@@ -79,8 +80,9 @@ Set a shared secret that the firmware will also use, then start the server:
 HYDRAX_DEVICE_KEY=choose-a-secret HYDRAX_ADMIN_KEY=a-different-secret npm start
 ```
 
-Open <http://localhost:8080> for the public site, and
-<http://localhost:8080/dashboard> for the monitoring dashboard.
+Open <http://localhost:8080> for the public site,
+<http://localhost:8080/dashboard> for the monitoring dashboard, and
+<http://localhost:8080/admin> for the operator console.
 On Windows PowerShell:
 
 ```powershell
@@ -155,6 +157,7 @@ Full details, including what is and is not covered, in
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, data flow, design decisions, offline behaviour |
 | [DASHBOARD.md](docs/DASHBOARD.md) | Dashboard sections, API/data mapping, demo mode, error states |
 | [WEBSITE.md](docs/WEBSITE.md) | Public site structure, design language, and the honesty guard |
+| [REQUESTS.md](docs/REQUESTS.md) | Customer quote flow, request API, operator console |
 | [STATE_MACHINE.md](docs/STATE_MACHINE.md) | Irrigation states and the full transition table |
 | [TELEMETRY.md](docs/TELEMETRY.md) | Payload schema, API endpoints, time handling |
 | [CONFIGURATION.md](docs/CONFIGURATION.md) | Every tunable, firmware and backend |

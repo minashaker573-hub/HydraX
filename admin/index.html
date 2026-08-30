@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HYDRAX — Quote Requests</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="stylesheet" href="/admin/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230f6fd1'/><path d='M50 18 C50 18 74 46 74 62 a24 24 0 0 1-48 0 C26 46 50 18 50 18Z' fill='white'/></svg>"
+    />
+  </head>
+
+  <body>
+    <header class="bar">
+      <div class="bar-inner">
+        <div class="brand">
+          <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true">
+            <path d="M50 14 C50 14 76 44 76 62 a26 26 0 0 1-52 0 C24 44 50 14 50 14Z" />
+          </svg>
+          <div class="brand-text">
+            <span class="brand-name">HYDRAX</span>
+            <span class="brand-sub">Operator console</span>
+          </div>
+        </div>
+        <div class="bar-actions">
+          <span class="link-state" id="link-state"></span>
+          <a class="btn btn-ghost" href="/dashboard">Dashboard</a>
+          <button class="btn btn-ghost" id="sign-out" type="button" hidden>Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap" id="main">
+      <!-- ===================================================== sign in -->
+      <section class="gate" id="gate">
+        <h1>Quote requests</h1>
+        <p class="gate-lede">
+          Customer submissions from the public site. This page holds personal data, so it needs the
+          operator key.
+        </p>
+
+        <form class="gate-form" id="gate-form">
+          <label for="admin-key">Operator key</label>
+          <input
+            id="admin-key" type="password" autocomplete="current-password"
+            placeholder="HYDRAX_ADMIN_KEY" required
+          />
+          <button class="btn btn-primary" type="submit">Unlock</button>
+        </form>
+        <p class="gate-error" id="gate-error" role="alert" hidden></p>
+        <p class="gate-note">
+          The key is held in this tab only, for as long as it stays open. It is never written to
+          disk and never sent anywhere except this server.
+        </p>
+      </section>
+
+      <!-- ===================================================== console -->
+      <section class="console" id="console" hidden>
+        <div class="console-head">
+          <h1>Quote requests</h1>
+          <button class="btn btn-outline" id="refresh" type="button">Refresh</button>
+        </div>
+
+        <div class="counts" id="counts"></div>
+
+        <div class="filters" id="filters">
+          <button class="filter" type="button" data-status="ALL" aria-pressed="true">All</button>
+          <button class="filter" type="button" data-status="NEW" aria-pressed="false">New</button>
+          <button class="filter" type="button" data-status="CONTACTED" aria-pressed="false">Contacted</button>
+          <button class="filter" type="button" data-status="QUOTED" aria-pressed="false">Quoted</button>
+          <button class="filter" type="button" data-status="CLOSED" aria-pressed="false">Closed</button>
+        </div>
+
+        <div id="list" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/admin/js/admin.js"></script>
+  </body>
+</html>

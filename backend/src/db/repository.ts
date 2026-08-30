@@ -5,10 +5,14 @@
  */
 
 import type { Db } from './index.ts';
+import { CAPABILITIES } from '../domain/types.ts';
 import type {
   AlertSeverity,
   AlertType,
+  Capability,
   EventPayload,
+  QuoteRequestInput,
+  RequestStatus,
   TelemetryPayload,
 } from '../domain/types.ts';
 import type { ZoneConfigInput } from '../domain/validate.ts';
@@ -79,6 +83,27 @@ export interface ZoneConfigRow {
   start_percent: number;
   stop_percent: number;
   updated_at: string;
+}
+
+export interface QuoteRequestRow {
+  id: number;
+  reference: string;
+  created_at: string;
+  updated_at: string;
+  status: RequestStatus;
+  farm_size: string;
+  farm_location: string;
+  irrigation_type: string;
+  zone_count: number;
+  full_name: string;
+  phone: string;
+  email: string | null;
+  notes: string | null;
+}
+
+/** A stored request together with the capabilities it asked for. */
+export interface QuoteRequest extends QuoteRequestRow {
+  capabilities: Capability[];
 }
 
 export class Repository {
@@ -398,5 +423,140 @@ export class Repository {
       this.db.exec('ROLLBACK');
       throw error;
     }
+  }
+
+  // --- quote requests ------------------------------------------------------
+
+  /**
+   * Inserts a request and its capabilities in one transaction, allocating a
+   * unique customer-facing reference.
+   *
+   * The reference is generated rather than derived from the row id so it does
+   * not leak how many requests exist, and retried on collision because a
+   * UNIQUE constraint is the only trustworthy uniqueness check.
+   */
+  insertQuoteRequest(
+    input: QuoteRequestInput,
+    now: string,
+    makeReference: () => string,
+    maxAttempts = 8,
+  ): QuoteRequest {
+    const insertRequest = this.db.prepare(
+      `INSERT INTO quote_requests
+         (reference, created_at, updated_at, status,
+          farm_size, farm_location, irrigation_type, zone_count,
+          full_name, phone, email, notes)
+       VALUES (?, ?, ?, 'NEW', ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    const insertCapability = this.db.prepare(
+      'INSERT INTO quote_request_capabilities (request_id, capability) VALUES (?, ?)',
+    );
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const reference = makeReference();
+      this.db.exec('BEGIN IMMEDIATE');
+      try {
+        const result = insertRequest.run(
+          reference,
+          now,
+          now,
+          input.farmSize,
+          input.farmLocation,
+          input.irrigationType,
+          input.zoneCount,
+          input.fullName,
+          input.phone,
+          input.email,
+          input.notes,
+        );
+        const id = Number(result.lastInsertRowid);
+        for (const capability of input.capabilities) {
+          insertCapability.run(id, capability);
+        }
+        this.db.exec('COMMIT');
+
+        return {
+          id,
+          reference,
+          created_at: now,
+          updated_at: now,
+          status: 'NEW',
+          farm_size: input.farmSize,
+          farm_location: input.farmLocation,
+          irrigation_type: input.irrigationType,
+          zone_count: input.zoneCount,
+          full_name: input.fullName,
+          phone: input.phone,
+          email: input.email,
+          notes: input.notes,
+          capabilities: input.capabilities,
+        };
+      } catch (error) {
+        this.db.exec('ROLLBACK');
+        // Only a reference collision is worth retrying; anything else is a
+        // real failure and must surface.
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/UNIQUE constraint failed: quote_requests.reference/.test(message)) {
+          throw error;
+        }
+      }
+    }
+    throw new Error(`could not allocate a unique request reference in ${maxAttempts} attempts`);
+  }
+
+  /**
+   * Capabilities in the domain's declared order, not alphabetical, so a
+   * request reads the same however it was fetched — and so the UI always lists
+   * the capability that actually ships today first.
+   */
+  getCapabilitiesFor(requestId: number): Capability[] {
+    const stored = new Set(
+      (
+        this.db
+          .prepare('SELECT capability FROM quote_request_capabilities WHERE request_id = ?')
+          .all(requestId) as unknown as { capability: Capability }[]
+      ).map((row) => row.capability),
+    );
+    return CAPABILITIES.filter((capability) => stored.has(capability));
+  }
+
+  getQuoteRequestByReference(reference: string): QuoteRequest | undefined {
+    const row = this.db
+      .prepare('SELECT * FROM quote_requests WHERE reference = ?')
+      .get(reference) as unknown as QuoteRequestRow | undefined;
+    if (row === undefined) return undefined;
+    return { ...row, capabilities: this.getCapabilitiesFor(row.id) };
+  }
+
+  listQuoteRequests(limit: number, status?: RequestStatus): QuoteRequest[] {
+    const rows = (
+      status === undefined
+        ? this.db
+            .prepare('SELECT * FROM quote_requests ORDER BY created_at DESC, id DESC LIMIT ?')
+            .all(limit)
+        : this.db
+            .prepare(
+              'SELECT * FROM quote_requests WHERE status = ? ORDER BY created_at DESC, id DESC LIMIT ?',
+            )
+            .all(status, limit)
+    ) as unknown as QuoteRequestRow[];
+
+    return rows.map((row) => ({ ...row, capabilities: this.getCapabilitiesFor(row.id) }));
+  }
+
+  countQuoteRequestsByStatus(): Record<string, number> {
+    const rows = this.db
+      .prepare('SELECT status, COUNT(*) AS n FROM quote_requests GROUP BY status')
+      .all() as unknown as { status: string; n: number }[];
+    const out: Record<string, number> = {};
+    for (const row of rows) out[row.status] = row.n;
+    return out;
+  }
+
+  updateQuoteRequestStatus(reference: string, status: RequestStatus, now: string): boolean {
+    const result = this.db
+      .prepare('UPDATE quote_requests SET status = ?, updated_at = ? WHERE reference = ?')
+      .run(status, now, reference);
+    return Number(result.changes) > 0;
   }
 }

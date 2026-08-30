@@ -40,6 +40,11 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     retentionDays: 30,
     dashboardDir: resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'dashboard'),
     websiteDir: resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'website'),
+    adminDir: resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'admin'),
+    // High by default so ordinary tests are not throttled; the abuse test
+    // overrides it to a small number deliberately.
+    requestRateMax: 10_000,
+    requestRateWindowMs: 60 * 60 * 1000,
     ...overrides,
   };
 }
@@ -221,4 +226,53 @@ export async function adminPost(
   });
   const text = await response.text();
   return { status: response.status, body: text === '' ? null : JSON.parse(text) };
+}
+
+/** GET as an operator (X-Admin-Key). */
+export async function adminGet(
+  harness: Harness,
+  path: string,
+  adminKey: string | null = TEST_ADMIN_KEY,
+): Promise<ApiResponse> {
+  const headers: Record<string, string> = {};
+  if (adminKey !== null) headers['X-Admin-Key'] = adminKey;
+
+  const response = await fetch(`${harness.baseUrl}${path}`, { headers });
+  const text = await response.text();
+  return { status: response.status, body: text === '' ? null : JSON.parse(text) };
+}
+
+/** PATCH as an operator (X-Admin-Key). */
+export async function adminPatch(
+  harness: Harness,
+  path: string,
+  body: unknown,
+  adminKey: string | null = TEST_ADMIN_KEY,
+): Promise<ApiResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (adminKey !== null) headers['X-Admin-Key'] = adminKey;
+
+  const response = await fetch(`${harness.baseUrl}${path}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(body),
+  });
+  const text = await response.text();
+  return { status: response.status, body: text === '' ? null : JSON.parse(text) };
+}
+
+/** A complete, valid quote request payload; override any field. */
+export function quotePayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    farm_size: '12 hectares',
+    farm_location: 'Beheira, Egypt',
+    irrigation_type: 'DRIP',
+    zone_count: 4,
+    capabilities: ['SMART_IRRIGATION'],
+    full_name: 'Amina Farouk',
+    phone: '+20 100 555 0134',
+    email: 'amina@example.com',
+    notes: 'Two wells, shared pump.',
+    ...overrides,
+  };
 }

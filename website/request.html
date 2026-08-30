@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Request Your HYDRAX System</title>
+    <meta
+      name="description"
+      content="Tell us about your farm and we will prepare a configuration and quote for your site."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230f6fd1'/><path d='M50 18 C50 18 74 46 74 62 a24 24 0 0 1-48 0 C26 46 50 18 50 18Z' fill='white'/></svg>"
+    />
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="nav" id="nav">
+      <div class="nav-inner">
+        <a class="brand" href="/" aria-label="HYDRAX home">
+          <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true">
+            <path d="M50 14 C50 14 76 44 76 62 a26 26 0 0 1-52 0 C24 44 50 14 50 14Z" />
+          </svg>
+          <span class="brand-text">
+            <span class="brand-name">HYDRAX</span>
+            <span class="brand-sub">SmartFarm Guardian</span>
+          </span>
+        </a>
+        <div class="nav-actions" style="margin-left: auto">
+          <a class="btn btn-ghost" href="/">Back to site</a>
+          <a class="btn btn-ghost" href="/dashboard">Live dashboard</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" class="request-page">
+      <div class="container narrow">
+        <p class="eyebrow">Request your HYDRAX system</p>
+        <h1 class="request-title">Tell us about your farm.</h1>
+        <p class="lede">
+          Three short steps. We will review your site and come back with a configuration and a
+          quote. No account, no payment, no obligation.
+        </p>
+
+        <!-- ========================================== progress -->
+        <ol class="steps" id="steps" aria-label="Progress">
+          <li class="step is-current" data-step="1"><span class="step-num">1</span><span class="step-name">Farm</span></li>
+          <li class="step" data-step="2"><span class="step-num">2</span><span class="step-name">Requirements</span></li>
+          <li class="step" data-step="3"><span class="step-num">3</span><span class="step-name">Contact</span></li>
+        </ol>
+
+        <!-- ========================================== form -->
+        <form class="request-form" id="request-form" novalidate>
+          <!-- ---------------------------------------- step 1 -->
+          <fieldset class="fs" data-panel="1">
+            <legend class="fs-legend">Farm information</legend>
+
+            <div class="field">
+              <label for="farm_size">Farm size <span class="req" aria-hidden="true">*</span></label>
+              <input
+                id="farm_size" name="farm_size" type="text" maxlength="60"
+                required autocomplete="off"
+                placeholder="e.g. 12 hectares, or 30 acres"
+                aria-describedby="farm_size_hint farm_size_err"
+              />
+              <p class="hint" id="farm_size_hint">Any unit you normally use is fine.</p>
+              <p class="err" id="farm_size_err" data-error-for="farm_size" hidden></p>
+            </div>
+
+            <div class="field">
+              <label for="farm_location">Farm location <span class="req" aria-hidden="true">*</span></label>
+              <input
+                id="farm_location" name="farm_location" type="text" maxlength="160"
+                required autocomplete="off"
+                placeholder="Region, district or nearest town"
+                aria-describedby="farm_location_err"
+              />
+              <p class="err" id="farm_location_err" data-error-for="farm_location" hidden></p>
+            </div>
+
+            <div class="field">
+              <span class="field-label">Irrigation type <span class="req" aria-hidden="true">*</span></span>
+              <div class="choices" role="radiogroup" aria-labelledby="irrigation_type_label">
+                <label class="choice">
+                  <input type="radio" name="irrigation_type" value="DRIP" required />
+                  <span class="choice-body"><span class="choice-title">Drip</span></span>
+                </label>
+                <label class="choice">
+                  <input type="radio" name="irrigation_type" value="SPRINKLER" />
+                  <span class="choice-body"><span class="choice-title">Sprinkler</span></span>
+                </label>
+                <label class="choice">
+                  <input type="radio" name="irrigation_type" value="OTHER" />
+                  <span class="choice-body"><span class="choice-title">Other</span></span>
+                </label>
+              </div>
+              <p class="err" id="irrigation_type_err" data-error-for="irrigation_type" hidden></p>
+            </div>
+
+            <div class="field field-narrow">
+              <label for="zone_count">Number of irrigation zones <span class="req" aria-hidden="true">*</span></label>
+              <input
+                id="zone_count" name="zone_count" type="number" inputmode="numeric"
+                min="1" max="64" step="1" required value="2"
+                aria-describedby="zone_count_hint zone_count_err"
+              />
+              <p class="hint" id="zone_count_hint">
+                A zone is an area you can water independently. Between 1 and 64.
+              </p>
+              <p class="err" id="zone_count_err" data-error-for="zone_count" hidden></p>
+            </div>
+
+            <div class="fs-actions">
+              <button class="btn btn-primary" type="button" data-next="2">Continue</button>
+            </div>
+          </fieldset>
+
+          <!-- ---------------------------------------- step 2 -->
+          <fieldset class="fs" data-panel="2" hidden>
+            <legend class="fs-legend">System requirements</legend>
+            <p class="fs-intro">
+              Which capabilities are you interested in? This tells us what to design toward — it
+              does not commit you to anything.
+            </p>
+
+            <div class="choices choices-stack">
+              <label class="choice">
+                <input type="checkbox" name="capabilities" value="SMART_IRRIGATION" checked />
+                <span class="choice-body">
+                  <span class="choice-title">
+                    Smart irrigation
+                    <span class="tag tag-ready">Available now</span>
+                  </span>
+                  <span class="choice-note">
+                    Soil-based irrigation control per zone, running on the controller.
+                  </span>
+                </span>
+              </label>
+
+              <label class="choice">
+                <input type="checkbox" name="capabilities" value="PUMP_MONITORING" />
+                <span class="choice-body">
+                  <span class="choice-title">
+                    Pump monitoring
+                    <span class="tag tag-dev">In development</span>
+                  </span>
+                  <span class="choice-note">
+                    Pump run state is reported today. Current, temperature and vibration sensing
+                    need hardware that is not yet part of the system.
+                  </span>
+                </span>
+              </label>
+
+              <label class="choice">
+                <input type="checkbox" name="capabilities" value="WATER_NETWORK_MONITORING" />
+                <span class="choice-body">
+                  <span class="choice-title">
+                    Water network monitoring
+                    <span class="tag tag-dev">In development</span>
+                  </span>
+                  <span class="choice-note">
+                    Pump and valve states are reported today. Flow measurement and leak detection
+                    require a flow meter that is not yet fitted.
+                  </span>
+                </span>
+              </label>
+
+              <label class="choice">
+                <input type="checkbox" name="capabilities" value="SAFETY_MONITORING" />
+                <span class="choice-body">
+                  <span class="choice-title">
+                    Safety monitoring
+                    <span class="tag tag-dev">In development</span>
+                  </span>
+                  <span class="choice-note">
+                    Firmware interlocks and fault alerts work today. Environmental sensing —
+                    temperature, gas, smoke, water detection — is not yet implemented.
+                  </span>
+                </span>
+              </label>
+            </div>
+            <p class="err" id="capabilities_err" data-error-for="capabilities" hidden></p>
+
+            <p class="fs-note">
+              Capabilities marked <strong>In development</strong> are not available for delivery
+              today. Telling us you want them helps us prioritise, and we will be explicit in your
+              quote about what ships now and what does not.
+            </p>
+
+            <div class="fs-actions">
+              <button class="btn btn-outline" type="button" data-back="1">Back</button>
+              <button class="btn btn-primary" type="button" data-next="3">Continue</button>
+            </div>
+          </fieldset>
+
+          <!-- ---------------------------------------- step 3 -->
+          <fieldset class="fs" data-panel="3" hidden>
+            <legend class="fs-legend">Your details</legend>
+
+            <div class="field">
+              <label for="full_name">Full name <span class="req" aria-hidden="true">*</span></label>
+              <input
+                id="full_name" name="full_name" type="text" maxlength="120"
+                required autocomplete="name"
+                aria-describedby="full_name_err"
+              />
+              <p class="err" id="full_name_err" data-error-for="full_name" hidden></p>
+            </div>
+
+            <div class="field">
+              <label for="phone">Phone <span class="req" aria-hidden="true">*</span></label>
+              <input
+                id="phone" name="phone" type="tel" maxlength="32"
+                required autocomplete="tel"
+                placeholder="+20 100 000 0000"
+                aria-describedby="phone_hint phone_err"
+              />
+              <p class="hint" id="phone_hint">Include the country code if you are outside our region.</p>
+              <p class="err" id="phone_err" data-error-for="phone" hidden></p>
+            </div>
+
+            <div class="field">
+              <label for="email">Email <span class="opt">optional</span></label>
+              <input
+                id="email" name="email" type="email" maxlength="254"
+                autocomplete="email"
+                aria-describedby="email_hint email_err"
+              />
+              <p class="hint" id="email_hint">If you would rather we called, leave this blank.</p>
+              <p class="err" id="email_err" data-error-for="email" hidden></p>
+            </div>
+
+            <div class="field">
+              <label for="notes">Anything else we should know? <span class="opt">optional</span></label>
+              <textarea
+                id="notes" name="notes" rows="4" maxlength="2000"
+                placeholder="Crop type, water source, existing controller, site constraints…"
+                aria-describedby="notes_count notes_err"
+              ></textarea>
+              <p class="hint" id="notes_count"><span id="notes_used">0</span> / 2000</p>
+              <p class="err" id="notes_err" data-error-for="notes" hidden></p>
+            </div>
+
+            <p class="fs-note">
+              We use your details only to prepare and discuss your quote.
+            </p>
+
+            <div class="fs-actions">
+              <button class="btn btn-outline" type="button" data-back="2">Back</button>
+              <button class="btn btn-primary" type="submit" id="submit-btn">
+                Submit request
+              </button>
+            </div>
+          </fieldset>
+
+          <p class="form-error" id="form-error" role="alert" hidden></p>
+        </form>
+
+        <!-- ========================================== confirmation -->
+        <section class="confirmation" id="confirmation" hidden tabindex="-1" aria-live="polite">
+          <div class="confirm-mark" aria-hidden="true">
+            <svg viewBox="0 0 52 52"><path d="M14 27 l8 8 l16 -18" /></svg>
+          </div>
+
+          <h2 class="confirm-title">Request submitted successfully.</h2>
+
+          <p class="confirm-lede">
+            Thank you. Your request has been recorded and our team will review your farm
+            requirements and contact you.
+          </p>
+
+          <div class="reference-block">
+            <p class="reference-label">Your request ID</p>
+            <p class="reference" id="reference-value">HYX-------</p>
+            <p class="reference-hint">
+              Please keep this reference. Quote it if you contact us about this request.
+            </p>
+          </div>
+
+          <div class="confirm-next">
+            <h3>What happens next</h3>
+            <ol class="confirm-steps">
+              <li>We review your zone count, irrigation type and site details.</li>
+              <li>We prepare a configuration and a quote specific to your farm.</li>
+              <li>We contact you using the details you provided.</li>
+            </ol>
+          </div>
+
+          <div class="confirm-actions">
+            <a class="btn btn-outline" href="/">Back to the site</a>
+            <a class="btn btn-ghost" href="/dashboard">See the live dashboard</a>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-legal">
+        <p>
+          HYDRAX quotes are prepared per farm. Zone count, pump size, cable runs and enclosure
+          requirements change the bill of materials, so we do not publish a list price.
+        </p>
+      </div>
+    </footer>
+
+    <script type="module" src="/js/request.js"></script>
+  </body>
+</html>

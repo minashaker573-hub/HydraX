@@ -15,7 +15,8 @@
     "mock-device": "node tools/mock-device.ts",
     "check:dashboard": "node ../dashboard/check.mjs",
     "check:website": "node ../website/check.mjs",
-    "check": "npm run check:dashboard && npm run check:website"
+    "check": "npm run check:dashboard && npm run check:website && npm run check:admin",
+    "check:admin": "node ../admin/check.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

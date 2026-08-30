@@ -53,7 +53,17 @@ export async function serveStatic(
       await stat(target);
     }
   } catch {
-    return false;
+    // Extensionless URLs: /request serves request.html. Keeps public links
+    // clean without a rewrite rule in front of the server. Only attempted for
+    // paths that carry no extension, so a genuine 404 for /missing.css stays
+    // a 404 rather than silently returning HTML.
+    if (extname(target) !== '') return false;
+    target = `${target}.html`;
+    try {
+      await stat(target);
+    } catch {
+      return false;
+    }
   }
 
   const contentType = MIME_TYPES[extname(target).toLowerCase()] ?? 'application/octet-stream';

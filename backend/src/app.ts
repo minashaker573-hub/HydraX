@@ -15,6 +15,7 @@ import { registerAlertRoutes } from './routes/alerts.ts';
 import { registerDashboardRoutes } from './routes/dashboard.ts';
 import { registerDeviceRoutes } from './routes/devices.ts';
 import { registerIngestRoutes } from './routes/ingest.ts';
+import { registerQuoteRoutes } from './routes/quotes.ts';
 import type { AppDeps } from './deps.ts';
 
 export type RequestListener = (req: IncomingMessage, res: ServerResponse) => void;
@@ -34,6 +35,7 @@ export function createRouter(deps: AppDeps): Router {
   registerDeviceRoutes(router, deps);
   registerAlertRoutes(router, deps);
   registerDashboardRoutes(router, deps);
+  registerQuoteRoutes(router, deps);
 
   return router;
 }
@@ -76,6 +78,12 @@ export function createApp(deps: AppDeps): RequestListener {
             // A deep link into the dashboard is handled client-side, so fall
             // back to its shell rather than 404-ing a valid route.
             if (await serveStatic(res, deps.config.dashboardDir, '/index.html')) return;
+          } else if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
+            // The operator console. Serving it does not grant access: every
+            // byte of customer data behind it needs the operator key, which
+            // the page asks for and never ships with.
+            const rest = url.pathname.slice('/admin'.length) || '/';
+            if (await serveStatic(res, deps.config.adminDir, rest)) return;
           } else {
             if (await serveStatic(res, deps.config.websiteDir, url.pathname)) return;
           }
