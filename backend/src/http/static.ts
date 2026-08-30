@@ -61,6 +61,15 @@ export async function serveStatic(
     'Content-Type': contentType,
     'Cache-Control': 'no-cache',
     'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'SAMEORIGIN',
+    'Referrer-Policy': 'no-referrer',
+    // Everything the dashboard and site need is served from this origin, so
+    // the policy can stay tight. 'unsafe-inline' covers the small amount of
+    // inline styling in the marketing pages; no inline script is permitted.
+    'Content-Security-Policy':
+      "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; " +
+      "script-src 'self'; connect-src 'self'; font-src 'self' data:; " +
+      "base-uri 'none'; form-action 'self'; frame-ancestors 'self'; object-src 'none'",
   });
   createReadStream(target).pipe(res);
   return true;

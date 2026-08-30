@@ -5,9 +5,8 @@
  * strictly, persist, then reconcile alerts.
  */
 
-import { timingSafeEqual } from 'node:crypto';
-
 import { applyEventAlerts, applyTelemetryAlerts } from '../domain/alerts.ts';
+import { authorizeDevice } from '../http/auth.ts';
 import { validateEvent, validateTelemetry } from '../domain/validate.ts';
 import { log } from '../log.ts';
 import { nowIso, type AppDeps } from '../deps.ts';
@@ -19,29 +18,6 @@ import {
   sendJson,
 } from '../http/respond.ts';
 import type { RequestContext, Router } from '../http/router.ts';
-
-/**
- * Constant-time comparison of the device key, so a wrong key cannot be
- * recovered by measuring how long the rejection takes.
- */
-function keyMatches(expected: string, provided: string): boolean {
-  const a = Buffer.from(expected, 'utf8');
-  const b = Buffer.from(provided, 'utf8');
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
-
-function authorize(ctx: RequestContext, deps: AppDeps): boolean {
-  if (deps.config.deviceKey === null) return true; // explicit insecure mode
-
-  const header = ctx.req.headers['x-device-key'];
-  const provided = Array.isArray(header) ? header[0] : header;
-  if (typeof provided !== 'string' || !keyMatches(deps.config.deviceKey, provided)) {
-    sendError(ctx.res, 401, 'invalid or missing X-Device-Key');
-    return false;
-  }
-  return true;
-}
 
 /** Turns body-reading failures into the right status code. */
 function handleBodyError(ctx: RequestContext, error: unknown): void {
@@ -58,7 +34,7 @@ function handleBodyError(ctx: RequestContext, error: unknown): void {
 
 export function registerIngestRoutes(router: Router, deps: AppDeps): void {
   router.post('/api/v1/telemetry', async (ctx) => {
-    if (!authorize(ctx, deps)) return;
+    if (!authorizeDevice(ctx, deps)) return;
 
     let body: unknown;
     try {
@@ -89,7 +65,7 @@ export function registerIngestRoutes(router: Router, deps: AppDeps): void {
   });
 
   router.post('/api/v1/events', async (ctx) => {
-    if (!authorize(ctx, deps)) return;
+    if (!authorizeDevice(ctx, deps)) return;
 
     let body: unknown;
     try {

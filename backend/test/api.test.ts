@@ -12,6 +12,7 @@ import {
   put,
   startHarness,
   telemetryPayload,
+  TEST_ADMIN_KEY,
   TEST_KEY,
   type Harness,
 } from './helpers.ts';
@@ -208,6 +209,38 @@ describe('zone configuration', () => {
     assert.equal(read.body.zones[0].start_percent, 30);
   });
 
+  test('refuses a threshold change without an operator key', async () => {
+    const h = await harness();
+    await post(h, '/api/v1/telemetry', telemetryPayload());
+
+    const body = { zones: [{ zone: 1, start_percent: 10, stop_percent: 90 }] };
+    // Anonymous and wrong-key callers must not be able to change when water flows.
+    assert.equal((await put(h, '/api/v1/devices/HYDRAX-TEST/config', body, null)).status, 401);
+    assert.equal((await put(h, '/api/v1/devices/HYDRAX-TEST/config', body, 'wrong')).status, 401);
+
+    // Nothing was written.
+    const read = await get(h, '/api/v1/devices/HYDRAX-TEST/config');
+    assert.equal(read.body.zones.length, 0);
+
+    assert.equal(
+      (await put(h, '/api/v1/devices/HYDRAX-TEST/config', body, TEST_ADMIN_KEY)).status,
+      200,
+    );
+  });
+
+  test('the device key is not accepted for operator actions', async () => {
+    const h = await harness();
+    await post(h, '/api/v1/telemetry', telemetryPayload());
+    // A key extracted from a controller must not grant threshold control.
+    const response = await put(
+      h,
+      '/api/v1/devices/HYDRAX-TEST/config',
+      { zones: [{ zone: 1, start_percent: 10, stop_percent: 90 }] },
+      TEST_KEY,
+    );
+    assert.equal(response.status, 401);
+  });
+
   test('rejects a band that would short-cycle the pump', async () => {
     const h = await harness();
     await post(h, '/api/v1/telemetry', telemetryPayload());
@@ -231,12 +264,37 @@ describe('routing', () => {
     assert.equal(response.status, 404);
   });
 
-  test('serves the dashboard for non-api paths', async () => {
+  test('serves the public website at the root', async () => {
     const h = await harness();
     const response = await fetch(`${h.baseUrl}/`);
     assert.equal(response.status, 200);
-    assert.match(response.headers.get('content-type') ?? '', /text\/html/);
+    assert.ok((response.headers.get('content-type') ?? '').startsWith('text/html'));
+  });
+
+  test('serves the dashboard under /dashboard', async () => {
+    const h = await harness();
+    const response = await fetch(`${h.baseUrl}/dashboard`);
+    assert.equal(response.status, 200);
     assert.match(await response.text(), /HYDRAX/);
+  });
+
+  test('serves dashboard assets under the mount prefix', async () => {
+    const h = await harness();
+    const css = await fetch(`${h.baseUrl}/dashboard/styles.css`);
+    assert.equal(css.status, 200);
+    assert.ok((css.headers.get('content-type') ?? '').startsWith('text/css'));
+
+    const js = await fetch(`${h.baseUrl}/dashboard/js/app.js`);
+    assert.equal(js.status, 200);
+    assert.match(js.headers.get('content-type') ?? '', /javascript/);
+  });
+
+  test('sets defensive headers on static responses', async () => {
+    const h = await harness();
+    const response = await fetch(`${h.baseUrl}/dashboard`);
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN');
+    assert.match(response.headers.get('content-security-policy') ?? '', /default-src 'self'/);
   });
 
   test('does not serve files outside the dashboard directory', async () => {

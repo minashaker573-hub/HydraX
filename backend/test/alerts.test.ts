@@ -7,11 +7,13 @@ import assert from 'node:assert/strict';
 
 import { sweepOfflineDevices } from '../src/domain/alerts.ts';
 import {
+  adminPost,
   eventPayload,
   get,
   post,
   startHarness,
   telemetryPayload,
+  TEST_ADMIN_KEY,
   type Harness,
 } from './helpers.ts';
 
@@ -158,19 +160,33 @@ describe('manual resolution', () => {
     await post(h, '/api/v1/telemetry', telemetryPayload({ status: 'SENSOR_ERROR' }));
     const id = (await get(h, '/api/v1/alerts')).body.alerts[0].id;
 
-    const resolved = await post(h, `/api/v1/alerts/${id}/resolve`, {});
+    const resolved = await adminPost(h, `/api/v1/alerts/${id}/resolve`, {});
     assert.equal(resolved.status, 200);
     assert.equal((await get(h, '/api/v1/alerts')).body.alerts.length, 0);
   });
 
   test('resolving an unknown or already-resolved alert 404s', async () => {
     const h = await harness();
-    assert.equal((await post(h, '/api/v1/alerts/999/resolve', {})).status, 404);
+    assert.equal((await adminPost(h, '/api/v1/alerts/999/resolve', {})).status, 404);
+  });
+
+  test('refuses to resolve without an operator key', async () => {
+    const h = await harness();
+    await post(h, '/api/v1/telemetry', telemetryPayload({ status: 'SENSOR_ERROR' }));
+    const id = (await get(h, '/api/v1/alerts')).body.alerts[0].id;
+
+    // Silencing a critical alert must not be possible for an anonymous caller.
+    assert.equal((await adminPost(h, `/api/v1/alerts/${id}/resolve`, {}, null)).status, 401);
+    assert.equal((await adminPost(h, `/api/v1/alerts/${id}/resolve`, {}, 'wrong')).status, 401);
+    // ...and the alert is still open.
+    assert.equal((await get(h, '/api/v1/alerts')).body.alerts.length, 1);
+
+    assert.equal((await adminPost(h, `/api/v1/alerts/${id}/resolve`, {}, TEST_ADMIN_KEY)).status, 200);
   });
 
   test('rejects a non-numeric alert id', async () => {
     const h = await harness();
-    assert.equal((await post(h, '/api/v1/alerts/abc/resolve', {})).status, 400);
+    assert.equal((await adminPost(h, '/api/v1/alerts/abc/resolve', {})).status, 400);
   });
 });
 

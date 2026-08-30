@@ -55,7 +55,8 @@ backend/           Node 24 + TypeScript, zero runtime dependencies
   src/             HTTP API, SQLite persistence, validation, alert rules
   test/            HTTP and domain tests
   tools/           mock device fixture
-dashboard/         static HTML/CSS/JS monitoring UI (no build step, ES modules)
+dashboard/         static HTML/CSS/JS monitoring UI, served at /dashboard
+website/           public product website, served at /
 docs/              architecture, state machine, telemetry, hardware, testing
 ```
 
@@ -75,18 +76,21 @@ npm install
 Set a shared secret that the firmware will also use, then start the server:
 
 ```bash
-HYDRAX_DEVICE_KEY=choose-a-secret npm start
+HYDRAX_DEVICE_KEY=choose-a-secret HYDRAX_ADMIN_KEY=a-different-secret npm start
 ```
 
-Open <http://localhost:8080>. On Windows PowerShell:
+Open <http://localhost:8080> for the public site, and
+<http://localhost:8080/dashboard> for the monitoring dashboard.
+On Windows PowerShell:
 
 ```powershell
-$env:HYDRAX_DEVICE_KEY = "choose-a-secret"; npm start
+$env:HYDRAX_DEVICE_KEY = "choose-a-secret"; $env:HYDRAX_ADMIN_KEY = "a-different-secret"; npm start
 ```
 
-> The server refuses to start without `HYDRAX_DEVICE_KEY`. For local
-> experimentation only, set `HYDRAX_ALLOW_INSECURE=true` instead to accept
-> unauthenticated telemetry.
+> The server refuses to start without both `HYDRAX_DEVICE_KEY` (controllers) and
+> `HYDRAX_ADMIN_KEY` (operator actions), which must differ. For local
+> experimentation only, set `HYDRAX_ALLOW_INSECURE=true` instead.
+> A template lives at `backend/.env.example`.
 
 ### 2. See it working without hardware
 

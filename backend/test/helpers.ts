@@ -17,6 +17,7 @@ import type { AppDeps } from '../src/deps.ts';
 setLogSilent(true);
 
 export const TEST_KEY = 'test-device-key';
+export const TEST_ADMIN_KEY = 'test-admin-key';
 
 export interface Harness {
   readonly repo: Repository;
@@ -33,10 +34,12 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     port: 0,
     dbPath: ':memory:',
     deviceKey: TEST_KEY,
+    adminKey: TEST_ADMIN_KEY,
     offlineTimeoutMs: 60_000,
     offlineSweepIntervalMs: 15_000,
     retentionDays: 30,
     dashboardDir: resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'dashboard'),
+    websiteDir: resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'website'),
     ...overrides,
   };
 }
@@ -181,10 +184,14 @@ export async function put(
   harness: Harness,
   path: string,
   body: unknown,
+  adminKey: string | null = TEST_ADMIN_KEY,
 ): Promise<ApiResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (adminKey !== null) headers['X-Admin-Key'] = adminKey;
+
   const response = await fetch(`${harness.baseUrl}${path}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
   const text = await response.text();
@@ -193,6 +200,25 @@ export async function put(
 
 export async function get(harness: Harness, path: string): Promise<ApiResponse> {
   const response = await fetch(`${harness.baseUrl}${path}`);
+  const text = await response.text();
+  return { status: response.status, body: text === '' ? null : JSON.parse(text) };
+}
+
+/** POST as an operator (X-Admin-Key) rather than as a device. */
+export async function adminPost(
+  harness: Harness,
+  path: string,
+  body: unknown,
+  adminKey: string | null = TEST_ADMIN_KEY,
+): Promise<ApiResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (adminKey !== null) headers['X-Admin-Key'] = adminKey;
+
+  const response = await fetch(`${harness.baseUrl}${path}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
   const text = await response.text();
   return { status: response.status, body: text === '' ? null : JSON.parse(text) };
 }

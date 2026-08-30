@@ -18,6 +18,9 @@ export function sendJson(res: ServerResponse, status: number, body: unknown): vo
     'Content-Length': Buffer.byteLength(payload),
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
+    // API responses are never a document and must never be framed.
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
   });
   res.end(payload);
 }

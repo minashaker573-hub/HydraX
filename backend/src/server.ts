@@ -27,6 +27,7 @@ function main(): void {
     config = loadConfig(process.env, {
       dbPath: join(BACKEND_ROOT, 'data', 'hydrax.db'),
       dashboardDir: join(PROJECT_ROOT, 'dashboard'),
+      websiteDir: join(PROJECT_ROOT, 'website'),
     });
   } catch (error) {
     if (error instanceof ConfigError) {
@@ -80,7 +81,8 @@ function main(): void {
 
   server.listen(config.port, config.host, () => {
     log.info('server', `HYDRAX backend listening on http://${config.host}:${config.port}`);
-    log.info('server', `Dashboard served from ${config.dashboardDir}`);
+    log.info('server', `Website   / -> ${config.websiteDir}`);
+    log.info('server', `Dashboard /dashboard -> ${config.dashboardDir}`);
   });
 
   const shutdown = (signal: string): void => {

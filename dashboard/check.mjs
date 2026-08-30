@@ -68,23 +68,44 @@ for (const file of files) {
 }
 
 // --- 3. entry point referenced by the page exists ---------------------------
+// The dashboard is mounted under /dashboard by the backend, so absolute URLs
+// in index.html carry that prefix. Strip it to get the on-disk path.
+const MOUNT = '/dashboard';
+
+function toDiskPath(urlPath) {
+  let rest = urlPath;
+  if (rest === MOUNT) rest = '/index.html';
+  else if (rest.startsWith(`${MOUNT}/`)) rest = rest.slice(MOUNT.length);
+  return join(HERE, rest.replace(/^\//, ''));
+}
+
 console.log('\nentry point:');
 const html = await readFile(join(HERE, 'index.html'), 'utf8');
 const scriptMatch = /<script[^>]*src="([^"]+)"/.exec(html);
 if (scriptMatch === null) {
   fail('index.html references no script');
+} else if (existsSync(toDiskPath(scriptMatch[1]))) {
+  ok(`index.html -> ${scriptMatch[1]}`);
 } else {
-  const entry = join(HERE, scriptMatch[1].replace(/^\//, ''));
-  if (existsSync(entry)) ok(`index.html -> ${scriptMatch[1]}`);
-  else fail(`index.html references missing ${scriptMatch[1]}`);
+  fail(`index.html references missing ${scriptMatch[1]}`);
 }
 
 const cssMatch = /<link[^>]*href="(\/[^"]+\.css)"/.exec(html);
 if (cssMatch !== null) {
-  const css = join(HERE, cssMatch[1].replace(/^\//, ''));
-  if (existsSync(css)) ok(`index.html -> ${cssMatch[1]}`);
+  if (existsSync(toDiskPath(cssMatch[1]))) ok(`index.html -> ${cssMatch[1]}`);
   else fail(`index.html references missing ${cssMatch[1]}`);
 }
+
+// Absolute asset URLs must carry the mount prefix, or they 404 in production
+// while working in any setup that serves the folder at the root.
+console.log('\nmount prefix:');
+for (const [attr, value] of [...html.matchAll(/(?:src|href)="(\/[^"]+)"/g)].map((m) => [m[0], m[1]])) {
+  if (value.startsWith('/api/')) continue;
+  if (!value.startsWith(`${MOUNT}/`)) {
+    fail(`index.html asset "${value}" is missing the ${MOUNT} mount prefix`);
+  }
+}
+ok(`all absolute asset URLs carry ${MOUNT}`);
 
 // --- 4. no innerHTML --------------------------------------------------------
 // Telemetry carries device-supplied strings (event details, alert messages).

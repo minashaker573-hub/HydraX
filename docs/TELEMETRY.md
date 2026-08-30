@@ -134,8 +134,14 @@ and 429 are retried.
 ## Authentication
 
 Both ingestion endpoints require `X-Device-Key`, compared in constant time
-against `HYDRAX_DEVICE_KEY`. The server refuses to start unless that variable is
-set, or `HYDRAX_ALLOW_INSECURE=true` is given explicitly.
+against `HYDRAX_DEVICE_KEY`.
+
+Operator endpoints — `PUT /api/v1/devices/:id/config` and
+`POST /api/v1/alerts/:id/resolve` — require a **separate** `X-Admin-Key`
+matching `HYDRAX_ADMIN_KEY`. The device key is not accepted for them.
+
+The server refuses to start unless both are set and differ, or
+`HYDRAX_ALLOW_INSECURE=true` is given explicitly.
 
 Read endpoints are unauthenticated in Phase 1, on the assumption of a trusted
 LAN. See [known limitations](TESTING.md#known-gaps).
@@ -154,9 +160,9 @@ LAN. See [known limitations](TESTING.md#known-gaps).
 | `GET` | `/api/v1/devices/:id/telemetry?limit=` | Telemetry history |
 | `GET` | `/api/v1/devices/:id/events?limit=` | Event history |
 | `GET` | `/api/v1/devices/:id/config` | Zone thresholds |
-| `PUT` | `/api/v1/devices/:id/config` | Set zone thresholds |
+| `PUT` | `/api/v1/devices/:id/config` | Set zone thresholds *(operator auth)* |
 | `GET` | `/api/v1/alerts?active=` | Alerts (active by default) |
-| `POST` | `/api/v1/alerts/:id/resolve` | Manually resolve an alert |
+| `POST` | `/api/v1/alerts/:id/resolve` | Manually resolve an alert *(operator auth)* |
 | `GET` | `/api/v1/dashboard?events=` | Everything the dashboard renders, in one call |
 
 Responses cap `limit` at 500. Request bodies are capped at 64 KB and refused

@@ -52,6 +52,8 @@ missing rather than compiling with placeholder credentials.
 | --- | --- |
 | `esp32dev` | Normal device build |
 | `esp32dev_sim` | Same logic, simulated sensors (`-D HYDRAX_SIMULATE`) |
+| `esp32dev_bench` | Real logic, compressed safety timings (`-D HYDRAX_BENCH_TIMING`). **Never deploy.** |
+| `esp32dev_commission` | Interactive serial console for hardware bring-up |
 | `native` | Host build of `src/core` for the test suite |
 
 ---
@@ -63,20 +65,39 @@ All environment variables. `src/config.ts` is the only module that reads
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `HYDRAX_DEVICE_KEY` | *(none)* | Shared secret for ingestion. **Required.** |
+| `HYDRAX_DEVICE_KEY` | *(none)* | Shared secret controllers present in `X-Device-Key`. **Required.** |
+| `HYDRAX_ADMIN_KEY` | *(none)* | Operator secret for `X-Admin-Key`: threshold changes, alert resolution, quote requests. **Required, and must differ from the device key.** |
 | `HYDRAX_ALLOW_INSECURE` | `false` | Set `true` to run without a device key. Local development only. |
 | `HYDRAX_HOST` | `0.0.0.0` | Bind address |
 | `HYDRAX_PORT` | `8080` | Port |
 | `HYDRAX_DB_PATH` | `backend/data/hydrax.db` | SQLite file |
-| `HYDRAX_DASHBOARD_DIR` | `dashboard/` | Static files served |
+| `HYDRAX_DASHBOARD_DIR` | `dashboard/` | Dashboard, mounted at `/dashboard` |
+| `HYDRAX_WEBSITE_DIR` | `website/` | Public website, mounted at `/` |
 | `HYDRAX_OFFLINE_TIMEOUT_MS` | `60000` | Silence before a device is offline |
 | `HYDRAX_OFFLINE_SWEEP_MS` | `15000` | Offline check interval |
 | `HYDRAX_RETENTION_DAYS` | `30` | Telemetry retention; `0` disables pruning |
 | `HYDRAX_LOG_LEVEL` | `INFO` | `ERROR`, `WARN`, `INFO`, `DEBUG` |
 
-### The device key is mandatory by design
+### Two keys, two roles
 
-The server **refuses to start** without `HYDRAX_DEVICE_KEY`:
+The **device key** is flashed into firmware on every controller in the field. The
+**operator key** is not. Keeping them separate means rotating the operator
+credential does not require reflashing hardware, and extracting a key from one
+board does not grant the ability to rewrite thresholds for the whole farm. The
+server refuses to start if they are set to the same value.
+
+| Role | Header | Guards |
+| --- | --- | --- |
+| Device | `X-Device-Key` | `POST /api/v1/telemetry`, `POST /api/v1/events` |
+| Operator | `X-Admin-Key` | `PUT /api/v1/devices/:id/config`, `POST /api/v1/alerts/:id/resolve` |
+
+Neither affects the control path: the firmware never calls an operator endpoint,
+and irrigation continues whether or not any of these checks pass.
+
+### Secrets are mandatory by design
+
+The server **refuses to start** without both keys, and refuses to start if they
+are identical:
 
 ```
 [ERROR][config] HYDRAX_DEVICE_KEY is not set. Set it to a shared secret that
@@ -85,16 +106,21 @@ unauthenticated telemetry (local development only).
 ```
 
 There is no default secret to forget to change, and disabling authentication
-requires saying so explicitly. When insecure mode is on, the server logs a
-warning on every start.
+requires saying so explicitly — `HYDRAX_ALLOW_INSECURE` must be exactly the
+string `true`, so a stray `1` or `yes` does not silently open the server. When
+insecure mode is on, the server logs a warning on every start.
+
+These rules are covered by `backend/test/config.test.ts`.
 
 ### Example `.env`
 
-Not read automatically — export these, or use your process manager. **Do not
-commit it**; `.env` is git-ignored.
+A template is committed at `backend/.env.example`; copy it to `backend/.env` and
+fill it in. It is not read automatically — export the values, or point your
+process manager at the file. **Do not commit `.env`**; it is git-ignored.
 
 ```bash
 HYDRAX_DEVICE_KEY=a-long-random-string
+HYDRAX_ADMIN_KEY=a-different-long-random-string
 HYDRAX_PORT=8080
 HYDRAX_RETENTION_DAYS=30
 ```
@@ -106,6 +132,7 @@ HYDRAX_RETENTION_DAYS=30
 ```bash
 curl -X PUT http://localhost:8080/api/v1/devices/HYDRAX-001/config \
   -H 'Content-Type: application/json' \
+  -H "X-Admin-Key: $HYDRAX_ADMIN_KEY" \
   -d '{"zones":[{"zone":1,"start_percent":30,"stop_percent":55},
                 {"zone":2,"start_percent":35,"stop_percent":60}]}'
 ```

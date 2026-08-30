@@ -3,6 +3,7 @@
  */
 
 import { isOnline } from '../domain/alerts.ts';
+import { authorizeAdmin } from '../http/auth.ts';
 import { validateZoneConfig } from '../domain/validate.ts';
 import { nowIso, type AppDeps } from '../deps.ts';
 import {
@@ -148,6 +149,9 @@ export function registerDeviceRoutes(router: Router, deps: AppDeps): void {
   });
 
   router.put('/api/v1/devices/:deviceId/config', async (ctx) => {
+    // Operator action: changing a threshold changes when water flows.
+    if (!authorizeAdmin(ctx, deps)) return;
+
     const deviceId = ctx.params.deviceId!;
     if (deps.repo.getDevice(deviceId) === undefined) {
       sendError(ctx.res, 404, `unknown device "${deviceId}"`);

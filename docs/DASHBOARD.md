@@ -179,8 +179,12 @@ npm install
 HYDRAX_DEVICE_KEY=your-secret npm start
 ```
 
-Open <http://localhost:8080>. The backend serves the dashboard from
-`dashboard/` — there is nothing to build.
+Open <http://localhost:8080/dashboard>. The backend serves the dashboard from
+`dashboard/` mounted at `/dashboard`, and the public website from `website/` at
+`/`. There is nothing to build.
+
+Absolute asset URLs in `index.html` therefore carry the `/dashboard` prefix;
+`npm run check:dashboard` fails the build if one is missing it.
 
 ### Checks
 

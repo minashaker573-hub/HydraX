@@ -26,10 +26,6 @@ export async function fetchDevice(deviceId) {
   return getJson(`/api/v1/devices/${encodeURIComponent(deviceId)}`);
 }
 
-export async function fetchHealth() {
-  return getJson('/health');
-}
-
 async function getJson(path) {
   const response = await fetch(path, { cache: 'no-store' });
   if (!response.ok) {

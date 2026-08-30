@@ -27,6 +27,10 @@ Under PlatformIO instead:
 pio test -e native
 ```
 
+This reports each test individually (50 test cases) via the custom runner in
+`firmware/test/test_custom_runner.py`. It needs a host compiler on `PATH`;
+the plain `g++` invocation above needs nothing else.
+
 To see the controller's own log output while tests run:
 
 ```bash

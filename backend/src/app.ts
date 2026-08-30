@@ -65,10 +65,20 @@ export function createApp(deps: AppDeps): RequestListener {
           return;
         }
 
-        // Anything not an API route falls through to the dashboard.
+        // Static surfaces. Two roots, because the public site and the operator
+        // dashboard have different audiences and are deployed as one process:
+        //   /dashboard/**  -> the monitoring app
+        //   everything else -> the public website
         if (method === 'GET' && !url.pathname.startsWith('/api/')) {
-          const served = await serveStatic(res, deps.config.dashboardDir, url.pathname);
-          if (served) return;
+          if (url.pathname === '/dashboard' || url.pathname.startsWith('/dashboard/')) {
+            const rest = url.pathname.slice('/dashboard'.length) || '/';
+            if (await serveStatic(res, deps.config.dashboardDir, rest)) return;
+            // A deep link into the dashboard is handled client-side, so fall
+            // back to its shell rather than 404-ing a valid route.
+            if (await serveStatic(res, deps.config.dashboardDir, '/index.html')) return;
+          } else {
+            if (await serveStatic(res, deps.config.websiteDir, url.pathname)) return;
+          }
         }
 
         sendError(res, 404, `no route for ${method} ${url.pathname}`);
