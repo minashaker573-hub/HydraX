@@ -10,6 +10,8 @@
  * are what the user sees.
  */
 
+import { API_BASE } from './config.js';
+
 const form = document.getElementById('request-form');
 const steps = document.getElementById('steps');
 const confirmation = document.getElementById('confirmation');
@@ -237,7 +239,7 @@ form.addEventListener('submit', async (event) => {
   formError.hidden = true;
 
   try {
-    const response = await fetch('/api/v1/requests', {
+    const response = await fetch(`${API_BASE}/api/v1/requests`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buildPayload()),

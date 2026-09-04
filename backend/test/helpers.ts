@@ -45,6 +45,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     // overrides it to a small number deliberately.
     requestRateMax: 10_000,
     requestRateWindowMs: 60 * 60 * 1000,
+    allowedOrigin: null,
     ...overrides,
   };
 }

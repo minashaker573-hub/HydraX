@@ -33,6 +33,16 @@ export interface Config {
   readonly requestRateMax: number;
   /** Rate limit window for public quote submissions, in ms. */
   readonly requestRateWindowMs: number;
+  /**
+   * Origin allowed to call the public quote endpoint cross-origin (CORS),
+   * e.g. `https://hydrax.example` when the website is deployed separately
+   * from this backend. `null` (the default) means same-origin only — no
+   * CORS headers are sent, matching the single-process deployment this
+   * project assumes by default. Exactly one origin, not a wildcard: the
+   * quote endpoint is unauthenticated, and an explicit origin is the
+   * difference between "this one known frontend" and "any website at all".
+   */
+  readonly allowedOrigin: string | null;
 }
 
 export class ConfigError extends Error {}
@@ -97,5 +107,6 @@ export function loadConfig(
     adminDir: env.HYDRAX_ADMIN_DIR ?? defaults.adminDir,
     requestRateMax: intFromEnv(env, 'HYDRAX_REQUEST_RATE_MAX', 10),
     requestRateWindowMs: intFromEnv(env, 'HYDRAX_REQUEST_RATE_WINDOW_MS', 60 * 60 * 1000),
+    allowedOrigin: env.HYDRAX_ALLOWED_ORIGIN?.trim() || null,
   };
 }

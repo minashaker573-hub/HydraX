@@ -19,6 +19,7 @@ import { clientKey, RateLimiter } from '../http/rate-limit.ts';
 import { log } from '../log.ts';
 import { nowIso, type AppDeps } from '../deps.ts';
 import {
+  applyCors,
   BodyParseError,
   BodyTooLargeError,
   readJsonBody,
@@ -59,7 +60,25 @@ export function registerQuoteRoutes(router: Router, deps: AppDeps): void {
   const limiter = new RateLimiter(deps.config.requestRateMax, deps.config.requestRateWindowMs);
 
   // ------------------------------------------------------------------ public
+  //
+  // CORS is opt-in and scoped to this one endpoint: the website is the only
+  // client ever expected to call it from a different origin (see config.ts
+  // HYDRAX_ALLOWED_ORIGIN). Every other route in this file requires the
+  // operator key and stays same-origin-only — there is no reason an operator
+  // console hosted elsewhere should ever need to read customer data through
+  // a browser CORS grant.
+  router.add('OPTIONS', '/api/v1/requests', (ctx) => {
+    applyCors(ctx.req, ctx.res, deps.config.allowedOrigin);
+    ctx.res.setHeader('Access-Control-Allow-Methods', 'POST');
+    ctx.res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    ctx.res.setHeader('Access-Control-Max-Age', '86400');
+    ctx.res.writeHead(204);
+    ctx.res.end();
+  });
+
   router.post('/api/v1/requests', async (ctx) => {
+    applyCors(ctx.req, ctx.res, deps.config.allowedOrigin);
+
     const decision = limiter.check(
       clientKey(ctx.req.headers, ctx.req.socket.remoteAddress ?? undefined),
       deps.now(),

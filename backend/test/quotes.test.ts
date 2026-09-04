@@ -392,3 +392,67 @@ describe('abuse resistance', () => {
     assert.equal(accepted + limited, 15);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Cross-origin support exists only so the website can be deployed separately
+// from this backend (e.g. Vercel + Render). Off by default; opt-in via
+// HYDRAX_ALLOWED_ORIGIN; exactly one origin, never a wildcard.
+describe('CORS (public quote endpoint)', () => {
+  test('same-origin deployment sends no CORS headers at all', async () => {
+    const h = await harness(); // allowedOrigin: null by default
+    const response = await fetch(`${h.baseUrl}/api/v1/requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://anything.example' },
+      body: JSON.stringify(quotePayload()),
+    });
+    assert.equal(response.headers.get('access-control-allow-origin'), null);
+  });
+
+  test('configured origin receives the allow header on success and on error', async () => {
+    const h = await harness({ allowedOrigin: 'https://hydrax-site.example' });
+
+    const ok = await fetch(`${h.baseUrl}/api/v1/requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://hydrax-site.example' },
+      body: JSON.stringify(quotePayload()),
+    });
+    assert.equal(ok.status, 201);
+    assert.equal(ok.headers.get('access-control-allow-origin'), 'https://hydrax-site.example');
+
+    // An error response must carry it too, or the browser hides the real
+    // validation error behind an opaque CORS failure.
+    const bad = await fetch(`${h.baseUrl}/api/v1/requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://hydrax-site.example' },
+      body: JSON.stringify({}),
+    });
+    assert.equal(bad.status, 400);
+    assert.equal(bad.headers.get('access-control-allow-origin'), 'https://hydrax-site.example');
+  });
+
+  test('a non-matching origin never gets the allow header', async () => {
+    const h = await harness({ allowedOrigin: 'https://hydrax-site.example' });
+    const response = await fetch(`${h.baseUrl}/api/v1/requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://attacker.example' },
+      body: JSON.stringify(quotePayload()),
+    });
+    assert.equal(response.headers.get('access-control-allow-origin'), null);
+  });
+
+  test('OPTIONS preflight answers with allow-methods and allow-headers', async () => {
+    const h = await harness({ allowedOrigin: 'https://hydrax-site.example' });
+    const response = await fetch(`${h.baseUrl}/api/v1/requests`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://hydrax-site.example',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'content-type',
+      },
+    });
+    assert.equal(response.status, 204);
+    assert.equal(response.headers.get('access-control-allow-origin'), 'https://hydrax-site.example');
+    assert.equal(response.headers.get('access-control-allow-methods'), 'POST');
+    assert.equal(response.headers.get('access-control-allow-headers'), 'Content-Type');
+  });
+});

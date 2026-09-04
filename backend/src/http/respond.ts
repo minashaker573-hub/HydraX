@@ -11,6 +11,25 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
  */
 export const MAX_BODY_BYTES = 64 * 1024;
 
+/**
+ * Sets CORS headers for a single, specific allowed origin, only when the
+ * request's `Origin` matches it exactly. Not a wildcard, and a no-op when
+ * `allowedOrigin` is null — same-origin deployments never see these headers
+ * at all. `Vary: Origin` so a shared cache never serves one origin's
+ * allow-header to another.
+ */
+export function applyCors(
+  req: IncomingMessage,
+  res: ServerResponse,
+  allowedOrigin: string | null,
+): void {
+  if (allowedOrigin === null) return;
+  const origin = req.headers.origin;
+  if (origin !== allowedOrigin) return;
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  res.setHeader('Vary', 'Origin');
+}
+
 export function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
