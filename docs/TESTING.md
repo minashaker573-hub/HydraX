@@ -93,7 +93,7 @@ leaves an empty string rather than a half-written payload.
 
 ## Backend tests
 
-123 tests. Runs a real HTTP server on a real socket, against a real Postgres
+129 tests. Runs a real HTTP server on a real socket, against a real Postgres
 database (Supabase) — not an in-memory one. `HYDRAX_TEST_DATABASE_URL` (or
 `HYDRAX_DATABASE_URL`) must be set; `npm test` loads `.env` automatically if
 one exists (`node --env-file-if-exists=.env`, no dotenv dependency). Point it
@@ -122,7 +122,15 @@ each other's rows.
 All harnesses in one test *file* share a single small connection pool (see
 `test/helpers.ts`) rather than opening one each — a free-tier Postgres
 instance has a low absolute connection ceiling, and this suite creates well
-over a hundred harnesses across all files.
+over a hundred harnesses across all files. That pool asks for `max: 2`, not
+the production default of 5: Supabase's Session pooler enforces its own
+project-wide connection ceiling (15 on the free tier) on top of Postgres's
+own `max_connections`, and `node --test` runs several files concurrently by
+default, each with its own pool — measured hitting that ceiling with 5
+DB-touching files at `max: 5` each. `package.json`'s `test` script also caps
+`--test-concurrency=3` for the same reason. If a future test file adds
+meaningful new concurrent DB load, re-check this arithmetic before assuming
+it will just work.
 
 The real, disclosed cost: `npm test` now needs network access to a live
 Postgres instance, and runs in on the order of a minute rather than a few
@@ -154,6 +162,16 @@ the aggregate dashboard payload; branded 404 page for an unknown public path.
 headers at all; a configured `HYDRAX_ALLOWED_ORIGIN` gets the allow header on
 both success and error responses; a non-matching origin gets nothing; the
 OPTIONS preflight answers with the right allow-methods/allow-headers.
+
+**Reliability** (`test/db.test.ts`, `test/reliability.test.ts`) — an
+`'error'` event on the connection pool (what actually crashed a running
+server once — see commit `dfbfedc`) does not throw and the pool stays
+usable afterward; with the database genuinely unreachable (a real `pg.Pool`
+that has already been `.end()`ed, not a mock), `/health/live` still reports
+ok, `/health` answers a controlled `503` rather than a crash or a generic
+500, neither response leaks the connection string or a stack trace, a
+DB-dependent route fails safely instead of hanging, and the server stays up
+and answers the next request.
 
 **Alerts** — raised on `SENSOR_ERROR`; not duplicated while already open;
 auto-resolved when the condition clears; `SENSOR_RECOVERED` clears;
@@ -212,6 +230,26 @@ Verified honestly — these are **not** covered by automated tests:
 7. **No concurrency/load testing.** Postgres with a handful of devices and a
    small connection pool is comfortable, but this has not been measured.
 8. **Backend runs over plain HTTP.** TLS termination is left to a reverse proxy.
+9. **The static-file stream-error fix is reviewed, not exercised by a test.**
+   `http/static.ts` moved from `.pipe()` to `pipeline()` because an unhandled
+   error on that stream is the same crash class as `db/index.ts`'s pool
+   fix — but reliably inducing a real filesystem read error or a mid-transfer
+   client disconnect deterministically, cross-platform, without a mocking
+   library this project doesn't otherwise use, was not something a plain
+   automated test could do honestly. A real client-abort test was tried
+   (`AbortController` + `fetch`); the server survived every abort in a
+   10-iteration probe, but the abort consistently landed before the stream
+   layer engaged at all, so it did not actually exercise this code path.
+10. **`#transaction`'s rollback-error handling is reviewed, not tested.**
+    (`db/repository.ts`) A connection dying *mid-transaction*, as opposed to
+    while idle, cannot be induced without killing a live TCP connection at
+    the OS level mid-test.
+11. **The global `uncaughtException`/`unhandledRejection` handlers
+    (`server.ts`) are a safety net for failure modes not yet identified** —
+    by definition, there is no automated test for an unknown bug class. The
+    two specific vectors this project has actually hit (an idle pool
+    connection, a static-file stream) are each handled and tested at their
+    source instead; these two are deliberately the fallback, not the fix.
 
 ---
 

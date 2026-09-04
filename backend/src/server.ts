@@ -93,7 +93,20 @@ async function main(): Promise<void> {
     clearInterval(offlineTimer);
     if (retentionTimer !== undefined) clearInterval(retentionTimer);
     server.close(() => {
-      void closeDatabase(db).finally(() => process.exit(0));
+      void (async () => {
+        try {
+          await closeDatabase(db);
+        } catch (error) {
+          // Ending the pool failing is not a reason to hang here — log and
+          // exit anyway. Not wrapping this would leave an unhandled
+          // rejection: closeDatabase(db).finally(...) would still call
+          // process.exit, but the rejection itself would be unhandled in
+          // the meantime, which is fatal by default since Node 15.
+          log.error('server', `error closing database: ${(error as Error).message}`);
+        } finally {
+          process.exit(0);
+        }
+      })();
     });
     // Do not hang forever on a stuck connection.
     setTimeout(() => process.exit(1), 5000).unref();
@@ -101,6 +114,25 @@ async function main(): Promise<void> {
 
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+  // Defense in depth, not the primary fix: the two specific unhandled-'error'
+  // vectors this project has actually hit (pg.Pool on an idle connection,
+  // and a static-file stream — see db/index.ts and http/static.ts) are
+  // handled at their source. These two are a safety net for anything of the
+  // same class not yet found. They deliberately do NOT attempt a graceful
+  // shutdown: an uncaught exception or unhandled rejection means something
+  // happened that the code did not anticipate, so the process's state is
+  // not trustworthy enough to run more async cleanup in — log what happened
+  // in the same format as everything else, then exit immediately so the
+  // host's process manager restarts a clean instance.
+  process.on('uncaughtException', (error) => {
+    log.error('server', `uncaught exception: ${error.message}`);
+    process.exit(1);
+  });
+  process.on('unhandledRejection', (reason) => {
+    log.error('server', `unhandled rejection: ${reason instanceof Error ? reason.message : String(reason)}`);
+    process.exit(1);
+  });
 }
 
 main().catch((error: unknown) => {

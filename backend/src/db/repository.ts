@@ -21,6 +21,7 @@
 
 import type { Db, DbClient } from './index.ts';
 import { isUniqueViolation } from './index.ts';
+import { log } from '../log.ts';
 import { CAPABILITIES } from '../domain/types.ts';
 import type {
   AlertSeverity,
@@ -174,7 +175,19 @@ export class Repository {
       await client.query('COMMIT');
       return result;
     } catch (error) {
-      await client.query('ROLLBACK');
+      // If the original failure was the connection itself dying mid-write,
+      // ROLLBACK on that same connection fails too — and un-guarded, that
+      // second error would replace the first in what gets thrown, hiding
+      // the actual cause and confusing callers that inspect the error (e.g.
+      // insertQuoteRequest's isUniqueViolation retry check). Postgres never
+      // commits a transaction whose connection dropped regardless of
+      // whether our own ROLLBACK call round-trips, so swallowing a failed
+      // rollback here loses nothing real.
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        log.error('db', `rollback failed after ${(error as Error).message}: ${(rollbackError as Error).message}`);
+      }
       throw error;
     } finally {
       client.release();

@@ -152,7 +152,8 @@ LAN. See [known limitations](TESTING.md#known-gaps).
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/health` | Liveness |
+| `GET` | `/health/live` | Liveness — process is up. Never touches the database. |
+| `GET` | `/health` | Readiness — process is up *and* the database is reachable. `503` (not a crash) if not. |
 | `POST` | `/api/v1/telemetry` | Ingest a sample *(auth)* |
 | `POST` | `/api/v1/events` | Ingest an event *(auth)* |
 | `GET` | `/api/v1/devices` | List devices with online status |

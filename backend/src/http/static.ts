@@ -8,7 +8,10 @@
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import type { ServerResponse } from 'node:http';
+
+import { log } from '../log.ts';
 
 const MIME_TYPES: Readonly<Record<string, string>> = {
   '.html': 'text/html; charset=utf-8',
@@ -84,6 +87,28 @@ export async function serveStatic(
       "script-src 'self'; connect-src 'self'; font-src 'self' data:; " +
       "base-uri 'none'; form-action 'self'; frame-ancestors 'self'; object-src 'none'",
   });
-  createReadStream(target).pipe(res);
+  // `.pipe()` does not propagate errors between the two streams — a read
+  // error (or a client disconnecting mid-download, which surfaces the same
+  // way) would emit 'error' on the file stream with nothing listening for
+  // it, and Node's default response to an unhandled stream 'error' event is
+  // to crash the process. Same bug class as the pg.Pool issue this project
+  // already hit in production once (see db/index.ts); `pipeline()` from
+  // node:stream/promises is the standard fix — it wires up error forwarding
+  // and cleanup between both streams and rejects instead.
+  try {
+    await pipeline(createReadStream(target), res);
+  } catch (error) {
+    // Headers are already sent by this point, so there is no error response
+    // left to send — only something to log and a connection to let close.
+    // A client disconnecting mid-download is the routine case, not a bug:
+    // Node reports it as ERR_STREAM_PREMATURE_CLOSE, worth a debug line, not
+    // an error-level alert.
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ERR_STREAM_PREMATURE_CLOSE') {
+      log.debug('static', `${target}: client disconnected mid-transfer`);
+    } else {
+      log.error('static', `${target}: streaming failed: ${(error as Error).message}`);
+    }
+  }
   return true;
 }

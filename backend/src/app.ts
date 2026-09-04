@@ -23,13 +23,36 @@ export type RequestListener = (req: IncomingMessage, res: ServerResponse) => voi
 export function createRouter(deps: AppDeps): Router {
   const router = new Router();
 
+  // Liveness: "is the process itself alive and accepting connections?" Never
+  // touches the database — a host's process-manager health check should not
+  // restart a perfectly good server instance just because Postgres is
+  // briefly unreachable, which is exactly what would happen if this were
+  // the only health endpoint and it depended on the DB.
+  router.get('/health/live', (ctx) => {
+    sendJson(ctx.res, 200, { status: 'ok', time: new Date(deps.now()).toISOString() });
+  });
+
+  // Readiness: "can this instance actually serve requests that depend on
+  // the database?" Its own try/catch, rather than relying on app.ts's
+  // generic catch-all, so a DB outage produces a specific, correct 503 —
+  // not a generic 500 indistinguishable from a real bug — without any risk
+  // of that failure propagating anywhere it could crash the process.
   router.get('/health', async (ctx) => {
-    const devices = await deps.repo.listDevices();
-    sendJson(ctx.res, 200, {
-      status: 'ok',
-      time: new Date(deps.now()).toISOString(),
-      devices: devices.length,
-    });
+    try {
+      const devices = await deps.repo.listDevices();
+      sendJson(ctx.res, 200, {
+        status: 'ok',
+        time: new Date(deps.now()).toISOString(),
+        devices: devices.length,
+      });
+    } catch (error) {
+      log.error('health', `readiness check failed: ${(error as Error).message}`);
+      sendJson(ctx.res, 503, {
+        status: 'error',
+        time: new Date(deps.now()).toISOString(),
+        database: 'unreachable',
+      });
+    }
   });
 
   registerIngestRoutes(router, deps);

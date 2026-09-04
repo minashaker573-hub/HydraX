@@ -62,7 +62,10 @@ if (!TEST_DATABASE_URL) {
 // node:test scopes that hook to the *current test*, not the file — it fired
 // after the first test instead of the last, closing the pool while later
 // tests in the same file still needed it.
-const sharedPool: Db = createPool(TEST_DATABASE_URL!);
+// max: 2, not the production default of 5 — node:test runs multiple test
+// files concurrently, each with its own pool; Supabase's Session pooler
+// caps total connections project-wide (15 on the free tier), not per pool.
+const sharedPool: Db = createPool(TEST_DATABASE_URL!, 2);
 function pool(): Db {
   return sharedPool;
 }

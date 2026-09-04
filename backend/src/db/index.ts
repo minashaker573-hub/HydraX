@@ -32,13 +32,31 @@ function isLocal(connectionString: string): boolean {
   return /^(localhost|127\.0\.0\.1)/.test(new URL(connectionString).hostname);
 }
 
-/** Opens a connection pool. Kept small: see the file header. */
-export function createPool(connectionString: string): Db {
+/**
+ * Opens a connection pool. Kept small: see the file header. `max` is
+ * overridable because Supabase's Session pooler enforces its own
+ * project-wide ceiling on top of Postgres's own `max_connections` — on the
+ * free tier, 15 total, across every pool this project's test suite and
+ * server open combined. The test suite runs several files concurrently,
+ * each with its own pool (see test/helpers.ts), so it asks for a smaller
+ * `max` than the single production pool needs.
+ */
+export function createPool(connectionString: string, max = 5): Db {
   const pool = new Pool({
     connectionString,
     ssl: isLocal(connectionString) ? undefined : { rejectUnauthorized: false },
-    max: 5,
+    max,
     idleTimeoutMillis: 10_000,
+    // Neither has a default (pg's default is 0 — no timeout at all), which
+    // means a network partition or a stuck Postgres backend would otherwise
+    // hang a request indefinitely rather than fail it — and with `max: 5`,
+    // enough hung requests exhaust the whole pool for every other request
+    // too. Bounded instead: connectionTimeoutMillis covers both opening a
+    // new physical connection and waiting for one to free up from the pool;
+    // query_timeout is enforced client-side by pg itself, so it applies
+    // even if the server never responds at all.
+    connectionTimeoutMillis: 10_000,
+    query_timeout: 20_000,
   });
 
   // `pg.Pool` emits 'error' when a connection sitting idle in the pool is
