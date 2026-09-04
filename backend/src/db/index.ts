@@ -34,12 +34,29 @@ function isLocal(connectionString: string): boolean {
 
 /** Opens a connection pool. Kept small: see the file header. */
 export function createPool(connectionString: string): Db {
-  return new Pool({
+  const pool = new Pool({
     connectionString,
     ssl: isLocal(connectionString) ? undefined : { rejectUnauthorized: false },
     max: 5,
     idleTimeoutMillis: 10_000,
   });
+
+  // `pg.Pool` emits 'error' when a connection sitting idle in the pool is
+  // dropped by the server or the network — the pooler recycling it, a
+  // network blip, anything. This is routine over a real network (it never
+  // happened with SQLite's local file) and NOT the same as a query failing:
+  // a query's own error rejects that query's promise and is handled by its
+  // caller. An idle connection has no caller to reject to, so `pg` surfaces
+  // it here instead. Node's default behavior for an unhandled 'error' event
+  // is to crash the process — verified: this took the whole server down
+  // once, on a connection nothing was actively using. The pool discards the
+  // dead connection and opens a new one on the next query on its own; there
+  // is nothing to do here except keep that from being fatal.
+  pool.on('error', (error: Error) => {
+    log.error('db', `idle connection lost: ${error.message}`);
+  });
+
+  return pool;
 }
 
 /**
