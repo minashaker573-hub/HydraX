@@ -78,6 +78,23 @@ function noDeviceState() {
   return frag(empty(t('noDevice.headline'), t('noDevice.detail')));
 }
 
+/**
+ * Stamps a zone card with its zone number and a compact signature of the
+ * real state that would make it worth animating (valve, irrigating, moisture
+ * status) — animations.js diffs this against the previous poll's signature
+ * so only a zone whose actual state changed animates, without that file
+ * having to duplicate this page's business logic to know what "changed"
+ * means for a zone.
+ */
+function markZoneState(node, zone, status) {
+  node.dataset.zone = String(zone.zone);
+  node.dataset.zoneSignature = [
+    zone.valve_open ? 'open' : 'closed',
+    zone.irrigating ? 'irrigating' : 'idle',
+    status ? status.label : '',
+  ].join('|');
+}
+
 function alertList(alerts) {
   const wrap = el('div');
   for (const alertItem of alerts) {
@@ -85,6 +102,9 @@ function alertList(alerts) {
       'div',
       `alert alert-${alertItem.severity === 'critical' ? 'critical' : 'warning'}`,
     );
+    // Lets animations.js tell a genuinely new alert apart from one already on
+    // screen across the app's polling renders — see onViewRendered there.
+    if (alertItem.id !== undefined) node.dataset.alertId = String(alertItem.id);
     const body = el('div', 'alert-body');
     body.appendChild(el('strong', 'alert-type', localizedLabel('alertType', alertItem.type)));
     body.appendChild(el('div', 'alert-msg', alertItem.message));
@@ -102,6 +122,8 @@ function eventTimeline(events, limit) {
   const list = el('ul', 'timeline');
   for (const event of events.slice(0, limit)) {
     const item = el('li', 'event');
+    // See alertList() above — same purpose, for the event timeline.
+    if (event.id !== undefined) item.dataset.eventId = String(event.id);
     item.appendChild(pill(localizedLabel('eventType', event.type), eventTone(event.type)));
 
     const parts = [];
@@ -156,6 +178,7 @@ export function overviewView(state, { onNavigate } = {}) {
       naReason: isNum(avg) ? undefined : t('overview.noValidReadings'),
       tone: 'water',
       icon: 'moisture',
+      countUp: isNum(avg) ? avg : undefined,
     }),
   );
 
@@ -317,6 +340,7 @@ function systemControlPanel(device) {
 function zoneSummaryCard(zone, device, onViewDetails) {
   const status = moistureStatus(zone.average, zone.config);
   const node = el('div', `card zone-summary-card${zone.irrigating ? ' is-active' : ''}`);
+  markZoneState(node, zone, status);
 
   const head = el('div', 'card-head');
   head.appendChild(el('h3', 'card-title', t('common.zone', { n: zone.zone })));
@@ -463,6 +487,9 @@ function pipeline(device) {
 
 function stage(name, value, detail, active) {
   const node = el('div', `stage${active ? ' is-active' : ''}`);
+  // Read by animations.js to tell which stage newly became active between
+  // one poll and the next — see syncControlLoop() there.
+  node.dataset.stage = name;
   node.appendChild(el('div', 'stage-name', name));
   node.appendChild(el('div', 'stage-value', value));
   node.appendChild(el('div', 'stage-detail', detail));
@@ -516,6 +543,7 @@ function zoneCard(zone, device) {
   const status = moistureStatus(zone.average, zone.config);
   const cov = coverage(zone.valid_sensors);
   const node = el('div', `card zone-card${zone.irrigating ? ' is-active' : ''}`);
+  markZoneState(node, zone, status);
 
   const head = el('div', 'card-head');
   head.appendChild(el('h3', 'card-title', t('common.zone', { n: zone.zone })));
@@ -645,6 +673,7 @@ export function pumpView(state) {
       value: String(starts),
       sub: t('pumpPage.fromEventsNotCounter'),
       tone: 'idle',
+      countUp: starts,
     }),
   );
   kpis.appendChild(
@@ -653,6 +682,7 @@ export function pumpView(state) {
       value: String(timeouts + faults),
       sub: t('pumpPage.timeoutFaultBreakdown', { timeouts, faults }),
       tone: timeouts + faults > 0 ? 'warn' : 'ok',
+      countUp: timeouts + faults,
     }),
   );
   out.appendChild(section(t('pumpPage.reportedState'), t('pumpPage.realDataFrom'), kpis));
@@ -804,6 +834,7 @@ export function safetyView(state) {
       value: String(timedOut),
       sub: t('safetyPage.maxRuntimeAborts'),
       tone: timedOut > 0 ? 'warn' : 'ok',
+      countUp: timedOut,
     }),
   );
   out.appendChild(section(t('safetyPage.failsafeState'), t('safetyPage.realSafetyTelemetry'), kpis));

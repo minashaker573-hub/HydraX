@@ -28,6 +28,11 @@ import {
   safetyView,
   waterView,
 } from './views.js';
+// Presentation only — see animations.js's header comment. Removing this
+// import and the two call sites below (initPageAnimations in start(), and
+// onViewRendered in render()) leaves every render/poll/navigation path
+// working exactly as before.
+import { createDiffMemory, initPageAnimations, onViewRendered } from './animations.js';
 
 const LIVE_POLL_MS = 3000;
 const SLOW_POLL_MS = 15000;
@@ -56,6 +61,13 @@ const state = {
   error: null,
   lastSuccessAt: 0,
 };
+
+// What animations.js remembers between renders (ids already shown, each
+// zone's last signature, etc.) so a poll-triggered refresh can animate only
+// what genuinely changed instead of replaying entrances every 3s. Purely a
+// presentation concern — see animations.js's header comment.
+const animMemory = createDiffMemory();
+let firstRenderDone = false;
 
 const nodes = {
   view: document.getElementById('view'),
@@ -91,7 +103,7 @@ function setView(name, { focus = false } = {}) {
     window.location.hash = name;
   }
   closeSidebar();
-  render();
+  render('nav');
   if (focus) nodes.view.focus();
 }
 
@@ -100,7 +112,7 @@ for (const item of nodes.navItems) {
 }
 window.addEventListener('hashchange', () => {
   state.view = readViewFromHash();
-  render();
+  render('nav');
 });
 
 /* --------------------------------------------------------- mobile drawer -- */
@@ -152,7 +164,10 @@ function syncLangButtons() {
 onLangChange(() => {
   applyStaticTranslations();
   syncLangButtons();
-  render();
+  // 'lang' rather than 'poll': every label on the page just changed, so this
+  // is a fresh look at the view, not a background data refresh — same
+  // entrance treatment as navigating to it. See animations.js.
+  render('lang');
 });
 
 /* ----------------------------------------------------------- notification -- */
@@ -237,19 +252,34 @@ function renderChrome() {
 
 /* --------------------------------------------------------------- render -- */
 
-function render() {
+/**
+ * `reason` distinguishes a genuinely fresh look at a view (first load,
+ * navigation, a language switch — 'boot' | 'nav' | 'lang') from the 3s/15s
+ * background poll ('poll', the default). Only the former gets the entrance
+ * animation choreography; see animations.js's header comment for why. The
+ * very first render of the whole session is always treated as 'boot'
+ * regardless of what triggered it, since `start()` calls `pollLive()` before
+ * the interval timers exist.
+ */
+function render(reason = 'poll') {
+  const effectiveReason = firstRenderDone ? reason : 'boot';
+
   renderChrome();
   const container = nodes.view;
   container.replaceChildren();
 
   // Backend down and nothing cached: say so, don't render an empty skeleton
-  // that reads like "everything is zero".
+  // that reads like "everything is zero". Deliberately does NOT set
+  // firstRenderDone: there is no real view content here to have "already
+  // shown", so whenever content first does appear (backend recovers) it
+  // still counts as the page's true first render, not a poll refresh.
   if (state.error && !state.device) {
     container.appendChild(
       banner('error', t('banner.backendUnreachableTitle'), t('banner.backendUnreachableBody', { reason: state.error })),
     );
     return;
   }
+  firstRenderDone = true;
 
   if (state.error && state.device) {
     container.appendChild(
@@ -280,11 +310,17 @@ function render() {
     view.render(state, {
       onFilter: (category) => {
         state.filter = category;
-        render();
+        render('nav'); // a filter click is a deliberate look, not a poll tick
       },
       onNavigate: (name) => setView(name, { focus: true }),
     }),
   );
+
+  onViewRendered(container, {
+    fresh: effectiveReason !== 'poll',
+    viewName: state.view,
+    memory: animMemory,
+  });
 }
 
 /* -------------------------------------------------------------- polling -- */
@@ -325,6 +361,11 @@ async function pollSlow() {
 async function start() {
   applyStaticTranslations();
   syncLangButtons();
+  // The shell (sidebar/topbar/nav) animates in immediately rather than
+  // waiting on the first telemetry fetch, so the page visibly "comes online"
+  // right away; the view content's own entrance (see render()) follows
+  // naturally once that fetch resolves.
+  initPageAnimations({ sidebar: nodes.sidebar, topbar: document.querySelector('.topbar'), navItems: nodes.navItems });
   await pollLive();
   await pollSlow();
   setInterval(pollLive, LIVE_POLL_MS);

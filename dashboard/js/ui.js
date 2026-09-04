@@ -77,8 +77,14 @@ export function icon(name) {
  * A headline metric. Pass `value: null` to render the unavailable state —
  * the tile still appears, so a missing signal is visible rather than hidden.
  * `icon` is optional and purely decorative — see ICON_PATHS above.
+ *
+ * `countUp`, if given, is the same real number `value` already renders
+ * (never a separate or guessed figure) — animations.js reads it to run a
+ * one-time count-up toward it on first appearance. Omit it for anything that
+ * isn't a genuine number (a status word, a duration string): counting up
+ * text makes no sense, and animations.js does nothing without this hook.
  */
-export function kpi({ label, value, unit, sub, tone, naReason, icon: iconName }) {
+export function kpi({ label, value, unit, sub, tone, naReason, icon: iconName, countUp }) {
   const card = el('div', `card card-stripe${tone ? ` is-${tone}` : ''}`);
   const inner = el('div', 'kpi-row');
 
@@ -98,6 +104,10 @@ export function kpi({ label, value, unit, sub, tone, naReason, icon: iconName })
     const line = el('div', typeof value === 'string' ? 'kpi-value is-text' : 'kpi-value');
     line.appendChild(document.createTextNode(String(value)));
     if (unit) line.appendChild(el('span', 'kpi-unit', unit));
+    if (typeof countUp === 'number' && Number.isFinite(countUp)) {
+      line.dataset.countUp = String(countUp);
+      line.dataset.countUpDecimals = String((String(value).split('.')[1] || '').length);
+    }
     body.appendChild(line);
     if (sub) body.appendChild(el('div', 'kpi-sub', sub));
   }
