@@ -9,10 +9,15 @@
  * Two cadences, because the data changes at two different rates:
  *   - live state  every 3s   (/api/v1/dashboard)
  *   - history     every 15s  (telemetry history, alert history, device detail)
+ *
+ * Language is a client-only concern: switching it re-renders the current view
+ * from the state already in memory (see `onLangChange` below) — no re-fetch,
+ * no reload. See i18n.js for the dictionary and persistence.
  */
 
 import { fetchAllAlerts, fetchDashboard, fetchDevice, fetchHistory } from './api.js';
 import { relativeTime } from './format.js';
+import { applyStaticTranslations, getLang, onLangChange, setLang, t } from './i18n.js';
 import { banner, el } from './ui.js';
 import {
   alertsView,
@@ -30,13 +35,13 @@ const STALE_AFTER_MS = 12000;
 const HISTORY_LIMIT = 150;
 
 const VIEWS = {
-  overview: { title: 'Overview', render: overviewView },
-  irrigation: { title: 'Smart Irrigation', render: irrigationView },
-  pump: { title: 'Pump Health', render: pumpView },
-  water: { title: 'Water Network', render: waterView },
-  safety: { title: 'Safety Center', render: safetyView },
-  alerts: { title: 'Alerts & Events', render: alertsView },
-  device: { title: 'Device', render: deviceView },
+  overview: { titleKey: 'nav.overview', render: overviewView },
+  irrigation: { titleKey: 'nav.irrigation', render: irrigationView },
+  pump: { titleKey: 'nav.pump', render: pumpView },
+  water: { titleKey: 'nav.water', render: waterView },
+  safety: { titleKey: 'nav.safety', render: safetyView },
+  alerts: { titleKey: 'nav.alerts', render: alertsView },
+  device: { titleKey: 'nav.device', render: deviceView },
 };
 
 /* --------------------------------------------------------------- state -- */
@@ -55,10 +60,21 @@ const state = {
 const nodes = {
   view: document.getElementById('view'),
   title: document.getElementById('view-title'),
-  linkState: document.getElementById('link-state'),
+  systemChip: document.getElementById('system-chip'),
+  topbarStatusDot: document.getElementById('topbar-status-dot'),
+  topbarStatusText: document.getElementById('topbar-status-text'),
   sourceBadge: document.getElementById('source-badge'),
   navCount: document.getElementById('nav-alert-count'),
   navItems: Array.from(document.querySelectorAll('.nav-item')),
+  sidebar: document.getElementById('sidebar'),
+  scrim: document.getElementById('sidebar-scrim'),
+  navToggle: document.getElementById('nav-toggle'),
+  notifButton: document.getElementById('notif-button'),
+  notifCount: document.getElementById('notif-count'),
+  deviceStatusDot: document.getElementById('device-status-dot'),
+  deviceStatusText: document.getElementById('device-status-text'),
+  deviceLastContact: document.getElementById('device-last-contact'),
+  langButtons: Array.from(document.querySelectorAll('[data-lang]')),
 };
 
 /* ------------------------------------------------------------- routing -- */
@@ -74,6 +90,7 @@ function setView(name, { focus = false } = {}) {
   if (window.location.hash !== `#${name}`) {
     window.location.hash = name;
   }
+  closeSidebar();
   render();
   if (focus) nodes.view.focus();
 }
@@ -86,11 +103,69 @@ window.addEventListener('hashchange', () => {
   render();
 });
 
+/* --------------------------------------------------------- mobile drawer -- */
+
+function openSidebar() {
+  if (!nodes.sidebar) return;
+  nodes.sidebar.classList.add('is-open');
+  if (nodes.scrim) nodes.scrim.hidden = false;
+  if (nodes.navToggle) nodes.navToggle.setAttribute('aria-expanded', 'true');
+}
+
+function closeSidebar() {
+  if (!nodes.sidebar) return;
+  nodes.sidebar.classList.remove('is-open');
+  if (nodes.scrim) nodes.scrim.hidden = true;
+  if (nodes.navToggle) nodes.navToggle.setAttribute('aria-expanded', 'false');
+}
+
+if (nodes.navToggle) {
+  nodes.navToggle.addEventListener('click', () => {
+    if (nodes.sidebar && nodes.sidebar.classList.contains('is-open')) closeSidebar();
+    else openSidebar();
+  });
+}
+if (nodes.scrim) nodes.scrim.addEventListener('click', closeSidebar);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeSidebar();
+});
+// A resize back to desktop must not leave the drawer state stuck open behind
+// a layout that no longer has a scrim for it.
+const wide = window.matchMedia('(min-width: 861px)');
+wide.addEventListener('change', (event) => {
+  if (event.matches) closeSidebar();
+});
+
+/* ------------------------------------------------------------- language -- */
+
+for (const button of nodes.langButtons) {
+  button.addEventListener('click', () => setLang(button.dataset.lang));
+}
+
+function syncLangButtons() {
+  const active = getLang();
+  for (const button of nodes.langButtons) {
+    button.setAttribute('aria-pressed', String(button.dataset.lang === active));
+  }
+}
+
+onLangChange(() => {
+  applyStaticTranslations();
+  syncLangButtons();
+  render();
+});
+
+/* ----------------------------------------------------------- notification -- */
+
+if (nodes.notifButton) {
+  nodes.notifButton.addEventListener('click', () => setView('alerts', { focus: true }));
+}
+
 /* --------------------------------------------------------------- chrome -- */
 
 function renderChrome() {
   const view = VIEWS[state.view];
-  nodes.title.textContent = view.title;
+  nodes.title.textContent = t(view.titleKey);
 
   for (const item of nodes.navItems) {
     if (item.dataset.view === state.view) {
@@ -110,29 +185,53 @@ function renderChrome() {
     badge.hidden = false;
     if (device.simulated) {
       badge.className = 'source-badge is-demo';
-      badge.textContent = 'DEMO / SIMULATION';
+      badge.textContent = t('chrome.demo');
     } else if (device.online) {
       badge.className = 'source-badge is-live';
-      badge.textContent = 'LIVE DATA';
+      badge.textContent = t('chrome.live');
     } else {
       badge.className = 'source-badge is-offline';
-      badge.textContent = 'DEVICE OFFLINE';
+      badge.textContent = t('chrome.deviceOffline');
     }
   }
 
   const openAlerts = device && device.alerts ? device.alerts.length : 0;
   nodes.navCount.hidden = openAlerts === 0;
   nodes.navCount.textContent = String(openAlerts);
+  if (nodes.notifCount) {
+    nodes.notifCount.hidden = openAlerts === 0;
+    nodes.notifCount.textContent = String(openAlerts);
+  }
 
-  // Link state reflects the DASHBOARD's own connection, and says plainly that
-  // it has no bearing on whether the farm is being watered.
-  if (state.error) {
-    const stale = Date.now() - state.lastSuccessAt > STALE_AFTER_MS;
-    nodes.linkState.className = stale ? 'link-state is-stale' : 'link-state';
-    nodes.linkState.textContent = `backend unreachable — controller unaffected`;
-  } else {
-    nodes.linkState.className = 'link-state';
-    nodes.linkState.textContent = `updated ${new Date().toLocaleTimeString()}`;
+  // System chip reflects the DASHBOARD's own connection to the backend — a
+  // different signal from the sidebar's device status below, and says
+  // plainly (via the banner, and this chip's title tooltip) that it has no
+  // bearing on whether the farm is being watered.
+  if (nodes.topbarStatusDot && nodes.topbarStatusText && nodes.systemChip) {
+    if (state.error) {
+      const stale = Date.now() - state.lastSuccessAt > STALE_AFTER_MS;
+      nodes.topbarStatusDot.className = 'status-dot';
+      nodes.topbarStatusDot.classList.toggle('is-crit', stale);
+      nodes.topbarStatusText.textContent = t('sidebar.disconnected');
+      nodes.systemChip.title = t('chrome.backendUnreachable');
+    } else {
+      nodes.topbarStatusDot.className = 'status-dot is-online';
+      nodes.topbarStatusText.textContent = t('sidebar.connected');
+      nodes.systemChip.title = t('chrome.updatedAt', { time: new Date().toLocaleTimeString() });
+    }
+  }
+
+  // Sidebar device status footer — only real fields, mirroring what the
+  // device detail already reports elsewhere on the dashboard.
+  if (nodes.deviceStatusDot && nodes.deviceStatusText) {
+    const online = Boolean(device && device.online);
+    nodes.deviceStatusDot.className = `status-dot${online ? ' is-online' : ''}`;
+    nodes.deviceStatusText.textContent = online ? t('sidebar.connected') : t('sidebar.disconnected');
+  }
+  if (nodes.deviceLastContact) {
+    nodes.deviceLastContact.textContent = device
+      ? `${t('sidebar.lastContact')}: ${relativeTime(device.last_seen_at)}`
+      : '';
   }
 }
 
@@ -147,11 +246,7 @@ function render() {
   // that reads like "everything is zero".
   if (state.error && !state.device) {
     container.appendChild(
-      banner(
-        'error',
-        'Backend unreachable.',
-        `${state.error}. The controller keeps irrigating locally — only this dashboard is affected.`,
-      ),
+      banner('error', t('banner.backendUnreachableTitle'), t('banner.backendUnreachableBody', { reason: state.error })),
     );
     return;
   }
@@ -160,28 +255,22 @@ function render() {
     container.appendChild(
       banner(
         'error',
-        'Showing last known state.',
-        `The backend stopped responding ${relativeTime(new Date(state.lastSuccessAt).toISOString())}. Values below may be out of date.`,
+        t('banner.lastKnownTitle'),
+        t('banner.lastKnownBody', { time: relativeTime(new Date(state.lastSuccessAt).toISOString()) }),
       ),
     );
   }
 
   if (state.device && state.device.simulated) {
-    container.appendChild(
-      banner(
-        'demo',
-        'DEMO / SIMULATION.',
-        'Telemetry on this page is synthetic, produced by the mock device fixture. It is not measured from soil.',
-      ),
-    );
+    container.appendChild(banner('demo', t('banner.demoTitle'), t('banner.demoBody')));
   }
 
   if (state.device && !state.device.online && !state.device.simulated) {
     container.appendChild(
       banner(
         'error',
-        'Device offline.',
-        `No telemetry since ${relativeTime(state.device.last_seen_at)}. The controller continues irrigating on its own rules; these values are the last reported.`,
+        t('banner.deviceOfflineTitle'),
+        t('banner.deviceOfflineBody', { time: relativeTime(state.device.last_seen_at) }),
       ),
     );
   }
@@ -193,6 +282,7 @@ function render() {
         state.filter = category;
         render();
       },
+      onNavigate: (name) => setView(name, { focus: true }),
     }),
   );
 }
@@ -233,6 +323,8 @@ async function pollSlow() {
 /* ----------------------------------------------------------------- boot -- */
 
 async function start() {
+  applyStaticTranslations();
+  syncLangButtons();
   await pollLive();
   await pollSlow();
   setInterval(pollLive, LIVE_POLL_MS);

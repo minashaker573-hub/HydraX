@@ -4,9 +4,15 @@
  * Everything is built with createElement/textContent, never innerHTML, so
  * device-supplied strings (event details, alert messages, device ids) can
  * never be interpreted as markup.
+ *
+ * Components here call `t()` directly for their own chrome (empty-state
+ * labels, chart/legend text) so they stay correct across a live language
+ * switch; text a *caller* passes in (titles, labels, messages) is expected to
+ * already be translated by that caller.
  */
 
-import { isNum, NOT_AVAILABLE, percent } from './format.js';
+import { isNum, percent } from './format.js';
+import { t } from './i18n.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -43,19 +49,50 @@ export function pill(text, tone = 'idle', { dot = false, pulse = false } = {}) {
   return node;
 }
 
+/* ------------------------------------------------------------------ icons */
+
+// A small, fixed icon set in the same line-art language as the sidebar nav
+// icons — reused, not "random icons" pulled in from elsewhere. Purely
+// decorative (aria-hidden): every icon duplicates information already in the
+// label text next to it, never carries meaning on its own.
+const ICON_PATHS = {
+  moisture: 'M12 3s6 6.5 6 10.5a6 6 0 0 1-12 0C6 9.5 12 3 12 3Z',
+  temperature: 'M10 13.6V4.5a2 2 0 1 1 4 0v9.1a4 4 0 1 1-4 0Z',
+  system: 'M12 3v6M6.6 6.6a7 7 0 1 0 10.8 0',
+  irrigation: 'M3 12h4l2-7 4 14 2-7h6',
+  flow: 'M2 10c2-2 4-2 6 0s4 2 6 0 4-2 6 0M2 15c2-2 4-2 6 0s4 2 6 0 4-2 6 0',
+  valve: 'M12 3v4M12 17v4M5 12H1M23 12h-4M8 8l-2-2M18 8l2-2M8 16l-2 2M18 16l2 2M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z',
+};
+
+export function icon(name) {
+  const node = svg('svg', { class: 'kpi-icon-svg', viewBox: '0 0 24 24', 'aria-hidden': 'true' });
+  const path = ICON_PATHS[name];
+  if (path) node.appendChild(svg('path', { d: path }));
+  return node;
+}
+
 /* -------------------------------------------------------------------- KPI */
 
 /**
  * A headline metric. Pass `value: null` to render the unavailable state —
  * the tile still appears, so a missing signal is visible rather than hidden.
+ * `icon` is optional and purely decorative — see ICON_PATHS above.
  */
-export function kpi({ label, value, unit, sub, tone, naReason }) {
+export function kpi({ label, value, unit, sub, tone, naReason, icon: iconName }) {
   const card = el('div', `card card-stripe${tone ? ` is-${tone}` : ''}`);
+  const inner = el('div', 'kpi-row');
+
+  if (iconName) {
+    const badge = el('div', `kpi-icon${tone ? ` is-${tone}` : ''}`);
+    badge.appendChild(icon(iconName));
+    inner.appendChild(badge);
+  }
+
   const body = el('div', 'kpi');
   body.appendChild(el('div', 'kpi-label', label));
 
   if (value === null || value === undefined) {
-    body.appendChild(el('div', 'kpi-value na', NOT_AVAILABLE));
+    body.appendChild(el('div', 'kpi-value na', t('common.notAvailable')));
     if (naReason) body.appendChild(el('div', 'kpi-sub', naReason));
   } else {
     const line = el('div', typeof value === 'string' ? 'kpi-value is-text' : 'kpi-value');
@@ -65,7 +102,8 @@ export function kpi({ label, value, unit, sub, tone, naReason }) {
     if (sub) body.appendChild(el('div', 'kpi-sub', sub));
   }
 
-  card.appendChild(body);
+  inner.appendChild(body);
+  card.appendChild(inner);
   return card;
 }
 
@@ -76,7 +114,7 @@ export function row(label, value, { tone } = {}) {
   node.appendChild(el('span', 'row-label', label));
 
   if (value === null || value === undefined) {
-    node.appendChild(el('span', 'row-value is-na', NOT_AVAILABLE));
+    node.appendChild(el('span', 'row-value is-na', t('common.notAvailable')));
     return node;
   }
   if (typeof value === 'string' || typeof value === 'number') {
@@ -123,12 +161,12 @@ export function empty(headline, detail) {
 export function notAvailable(reason, planned = []) {
   const node = el('div', 'na-block');
   const title = el('div', 'na-title');
-  title.appendChild(pill(NOT_AVAILABLE, 'na'));
+  title.appendChild(pill(t('common.notAvailable'), 'na'));
   node.appendChild(title);
   node.appendChild(el('p', 'na-reason', reason));
 
   if (planned.length > 0) {
-    node.appendChild(el('div', 'kpi-label', 'UI prepared for'));
+    node.appendChild(el('div', 'kpi-label', t('ui.uiPreparedFor')));
     const list = el('ul', 'na-list');
     for (const item of planned) list.appendChild(el('li', null, item));
     node.appendChild(list);
@@ -147,9 +185,13 @@ export function banner(kind, strongText, message) {
 
 /* ------------------------------------------------------------------ gauge */
 
-/** Moisture bar showing the reading against the configured hysteresis band. */
+/** Moisture bar showing the reading against the configured hysteresis band.
+ *  Deliberately kept in a fixed left-to-right orientation regardless of page
+ *  direction: a 0–100% scale is a measurement axis, not prose, and mirroring
+ *  it under RTL would make it harder to read against the printed 0%/100%
+ *  labels, not easier. */
 export function gauge(average, config) {
-  const wrap = el('div');
+  const wrap = el('div', 'ltr-scale');
   const bar = el('div', 'gauge');
 
   const hasBand =
@@ -178,8 +220,8 @@ export function gauge(average, config) {
       'span',
       null,
       hasBand
-        ? `start ${config.start_percent}% · stop ${config.stop_percent}%`
-        : 'no threshold configured',
+        ? t('chart.startStop', { start: config.start_percent, stop: config.stop_percent })
+        : t('chart.noThreshold'),
     ),
   );
   scale.appendChild(el('span', null, '100%'));
@@ -205,10 +247,7 @@ const CHART_COLORS = ['var(--accent)', 'var(--ok)'];
 export function moistureChart(series, { height = 200 } = {}) {
   const usable = series.filter((s) => s.points.length >= 2);
   if (usable.length === 0) {
-    return empty(
-      'Not enough history yet',
-      'A chart appears once at least two telemetry samples have been recorded.',
-    );
+    return empty(t('chart.notEnoughHistory'), t('chart.notEnoughDetail'));
   }
 
   const width = 720;
@@ -226,7 +265,7 @@ export function moistureChart(series, { height = 200 } = {}) {
   }
   const tSpan = Math.max(1, tMax - tMin);
 
-  const x = (t) => pad.left + ((t - tMin) / tSpan) * plotW;
+  const x = (time) => pad.left + ((time - tMin) / tSpan) * plotW;
   const y = (v) => pad.top + (1 - clamp(v) / 100) * plotH;
 
   const root = svg('svg', {
@@ -271,7 +310,9 @@ export function moistureChart(series, { height = 200 } = {}) {
   root.appendChild(t1);
 
   const wrap = el('div');
-  const scroll = el('div', 'chart-wrap');
+  // The chart's own coordinate system stays LTR (see the gauge note above);
+  // only the surrounding legend text follows the page direction.
+  const scroll = el('div', 'chart-wrap ltr-scale');
   scroll.appendChild(root);
   wrap.appendChild(scroll);
 
@@ -281,10 +322,12 @@ export function moistureChart(series, { height = 200 } = {}) {
     const line = el('span', 'legend-line');
     line.style.background = CHART_COLORS[i % CHART_COLORS.length];
     item.appendChild(line);
-    item.appendChild(document.createTextNode(`${s.name} · now ${percent(s.points[s.points.length - 1].v)}%`));
+    item.appendChild(
+      document.createTextNode(`${s.name} · ${t('chart.now', { value: percent(s.points[s.points.length - 1].v) })}`),
+    );
     legend.appendChild(item);
   });
-  legend.appendChild(el('span', null, `${usable[0].points.length} samples`));
+  legend.appendChild(el('span', null, t('chart.samples', { n: usable[0].points.length })));
   wrap.appendChild(legend);
   return wrap;
 }
@@ -293,7 +336,8 @@ export function moistureChart(series, { height = 200 } = {}) {
 
 /**
  * Schematic farm layout. Deliberately flat and diagrammatic: it encodes zone
- * moisture, valve state and irrigation activity, and nothing else.
+ * moisture, valve state and irrigation activity, and nothing else. Kept in a
+ * fixed LTR orientation for the same reason as the gauge and chart above.
  */
 export function farmSchematic(device) {
   const zones = device.zones || [];
@@ -316,14 +360,14 @@ export function farmSchematic(device) {
     fill: 'var(--surface-2)', stroke: pumpColor, 'stroke-width': pumpOn ? 2 : 1,
   }));
   const pumpLabel = svg('text', { x: 53, y: 100, 'text-anchor': 'middle', class: 'chart-axis' });
-  pumpLabel.textContent = 'PUMP';
+  pumpLabel.textContent = t('farm.pump');
   root.appendChild(pumpLabel);
   const pumpState = svg('text', {
     x: 53, y: 118, 'text-anchor': 'middle', class: 'chart-axis',
     fill: pumpOn ? 'var(--water)' : 'var(--dim)',
     'font-weight': '700',
   });
-  pumpState.textContent = pumpOn ? 'ON' : 'OFF';
+  pumpState.textContent = pumpOn ? t('farm.on') : t('farm.off');
   root.appendChild(pumpState);
 
   // --- main line -----------------------------------------------------------
@@ -375,7 +419,7 @@ export function farmSchematic(device) {
     }
 
     const name = svg('text', { x: startX + 14, y: zy + 26, class: 'chart-axis', 'font-weight': '700' });
-    name.textContent = `ZONE ${zone.zone}`;
+    name.textContent = t('common.zone', { n: zone.zone });
     root.appendChild(name);
 
     const value = svg('text', {
@@ -390,7 +434,7 @@ export function farmSchematic(device) {
       x: startX + zoneW - 14, y: zy + 26, 'text-anchor': 'end', class: 'chart-axis',
       fill: zone.valve_open ? 'var(--water)' : 'var(--dim)', 'font-weight': '700',
     });
-    state.textContent = zone.valve_open ? 'VALVE OPEN' : 'VALVE CLOSED';
+    state.textContent = zone.valve_open ? t('farm.valveOpen') : t('farm.valveClosed');
     root.appendChild(state);
 
     // coverage warning, only when genuinely degraded
@@ -399,19 +443,21 @@ export function farmSchematic(device) {
         x: startX + zoneW - 14, y: zy + zoneH - 12, 'text-anchor': 'end', class: 'chart-axis',
         fill: zone.valid_sensors === 0 ? 'var(--crit)' : 'var(--warn)', 'font-weight': '700',
       });
-      warn.textContent = zone.valid_sensors === 0 ? 'NO VALID PROBE' : 'DEGRADED';
+      warn.textContent = zone.valid_sensors === 0 ? t('farm.noValidProbe') : t('farm.degraded');
       root.appendChild(warn);
     }
   });
 
   const wrap = el('div');
-  wrap.appendChild(root);
+  const scroll = el('div', 'ltr-scale');
+  scroll.appendChild(root);
+  wrap.appendChild(scroll);
 
   const legend = el('div', 'farm-legend');
-  legend.appendChild(legendItem('var(--water)', 'Water flowing / valve open'));
-  legend.appendChild(legendItem('var(--border-strong)', 'Idle'));
-  legend.appendChild(legendItem('var(--warn)', 'Degraded sensor coverage'));
-  legend.appendChild(el('span', null, 'Fill height = zone average moisture'));
+  legend.appendChild(legendItem('var(--water)', t('farm.waterFlowingOpen')));
+  legend.appendChild(legendItem('var(--border-strong)', t('farm.idle')));
+  legend.appendChild(legendItem('var(--warn)', t('farm.degradedCoverage')));
+  legend.appendChild(el('span', null, t('farm.fillHeightNote')));
   wrap.appendChild(legend);
   return wrap;
 }
