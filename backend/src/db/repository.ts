@@ -2,9 +2,25 @@
  * HYDRAX - data access.
  *
  * All SQL lives here. Routes deal in domain objects and never build queries.
+ *
+ * Postgres, accessed through `pg`. Every method is async — the SQLite version
+ * this was ported from was synchronous by nature of the driver, and every
+ * caller (routes/*.ts, domain/alerts.ts, app.ts, server.ts) now `await`s
+ * accordingly.
+ *
+ * A Repository is scoped to one Postgres schema (`'public'` in production; a
+ * unique per-test schema in test/helpers.ts, all sharing one pool). Every
+ * query goes through `#query`/`#transaction` below, which check out a
+ * connection and `SET search_path` on it before running anything — never
+ * `this.#query()` directly — because a shared pool can hand back a
+ * different physical connection on every call, so search_path cannot be set
+ * once and relied on afterward the way a single dedicated connection would
+ * allow. Multi-statement writes use `#transaction` so a sample is still
+ * either fully recorded or not recorded at all.
  */
 
-import type { Db } from './index.ts';
+import type { Db, DbClient } from './index.ts';
+import { isUniqueViolation } from './index.ts';
 import { CAPABILITIES } from '../domain/types.ts';
 import type {
   AlertSeverity,
@@ -16,6 +32,7 @@ import type {
   TelemetryPayload,
 } from '../domain/types.ts';
 import type { ZoneConfigInput } from '../domain/validate.ts';
+import type { QueryResult, QueryResultRow } from 'pg';
 
 export interface DeviceRow {
   device_id: string;
@@ -106,55 +123,97 @@ export interface QuoteRequest extends QuoteRequestRow {
   capabilities: Capability[];
 }
 
-export class Repository {
-  // Declared explicitly rather than as a constructor parameter property:
-  // parameter properties are not erasable syntax, and this project runs
-  // TypeScript directly under Node's type stripping with no build step.
-  readonly #db: Db;
+// node-postgres returns BIGINT/BIGSERIAL columns (telemetry.id and friends)
+// as strings, to avoid silently losing precision above 2^53. This project's
+// ids never approach that range, so every row-mapping helper below narrows
+// them back to number at the boundary, once, rather than carrying `string |
+// number` through the rest of the codebase.
+function toRow<T extends { id: unknown }>(row: T): T & { id: number } {
+  return { ...row, id: Number(row.id) };
+}
 
-  constructor(db: Db) {
-    this.#db = db;
+export class Repository {
+  readonly #pool: Db;
+  readonly #schema: string;
+
+  constructor(pool: Db, schema = 'public') {
+    this.#pool = pool;
+    this.#schema = schema;
   }
 
-  private get db(): Db {
-    return this.#db;
+  /**
+   * Checks out a connection, pins it to this repository's schema, runs one
+   * query, and releases it. See the file header for why this — not
+   * `this.#query()` — is how every non-transactional query in this
+   * class must be issued.
+   */
+  async #query<T extends QueryResultRow = QueryResultRow>(
+    sql: string,
+    params?: unknown[],
+  ): Promise<QueryResult<T>> {
+    const client = await this.#pool.connect();
+    try {
+      await client.query(`SET search_path TO "${this.#schema}"`);
+      return await client.query<T>(sql, params);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Runs `fn` on a single checked-out, schema-pinned connection wrapped in
+   * BEGIN/COMMIT, so a multi-statement write is atomic. Every statement
+   * inside `fn` must use the `client` it is given.
+   */
+  async #transaction<T>(fn: (client: DbClient) => Promise<T>): Promise<T> {
+    const client = await this.#pool.connect();
+    try {
+      await client.query(`SET search_path TO "${this.#schema}"`);
+      await client.query('BEGIN');
+      const result = await fn(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   // -------------------------------------------------------------------------
   // devices
   // -------------------------------------------------------------------------
 
-  upsertDevice(
+  async #upsertDevice(
+    client: DbClient,
     deviceId: string,
     firmware: string | null,
     uptimeMs: number,
     simulated: boolean,
     now: string,
-  ): void {
-    this.db
-      .prepare(
-        `INSERT INTO devices (device_id, firmware, first_seen_at, last_seen_at,
-                              last_uptime_ms, simulated)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(device_id) DO UPDATE SET
-           firmware       = COALESCE(excluded.firmware, devices.firmware),
-           last_seen_at   = excluded.last_seen_at,
-           last_uptime_ms = excluded.last_uptime_ms,
-           simulated      = excluded.simulated`,
-      )
-      .run(deviceId, firmware, now, now, uptimeMs, simulated ? 1 : 0);
+  ): Promise<void> {
+    await client.query(
+      `INSERT INTO devices (device_id, firmware, first_seen_at, last_seen_at,
+                            last_uptime_ms, simulated)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (device_id) DO UPDATE SET
+         firmware       = COALESCE(EXCLUDED.firmware, devices.firmware),
+         last_seen_at   = EXCLUDED.last_seen_at,
+         last_uptime_ms = EXCLUDED.last_uptime_ms,
+         simulated      = EXCLUDED.simulated`,
+      [deviceId, firmware, now, now, uptimeMs, simulated ? 1 : 0],
+    );
   }
 
-  getDevice(deviceId: string): DeviceRow | undefined {
-    return this.db.prepare('SELECT * FROM devices WHERE device_id = ?').get(deviceId) as
-      | DeviceRow
-      | undefined;
+  async getDevice(deviceId: string): Promise<DeviceRow | undefined> {
+    const result = await this.#query<DeviceRow>('SELECT * FROM devices WHERE device_id = $1', [deviceId]);
+    return result.rows[0];
   }
 
-  listDevices(): DeviceRow[] {
-    return this.db
-      .prepare('SELECT * FROM devices ORDER BY device_id')
-      .all() as unknown as DeviceRow[];
+  async listDevices(): Promise<DeviceRow[]> {
+    const result = await this.#query<DeviceRow>('SELECT * FROM devices ORDER BY device_id');
+    return result.rows;
   }
 
   // -------------------------------------------------------------------------
@@ -162,142 +221,129 @@ export class Repository {
   // -------------------------------------------------------------------------
 
   /** Persists one sample and repoints the device's current state at it. */
-  insertTelemetry(payload: TelemetryPayload, receivedAt: string): number {
-    const insertTelemetry = this.db.prepare(
-      `INSERT INTO telemetry (device_id, received_at, device_uptime_ms, device_time,
-                              irrigation_state, active_zone, run_ms, pump_on,
-                              controller_status, wifi_connected, rssi, simulated)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    const insertZone = this.db.prepare(
-      `INSERT INTO telemetry_zone (telemetry_id, zone, sensor_1, sensor_2,
-                                   sensor_1_valid, sensor_2_valid, average,
-                                   valid_sensors, valve_open)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    const upsertState = this.db.prepare(
-      `INSERT INTO device_state (device_id, telemetry_id, updated_at)
-       VALUES (?, ?, ?)
-       ON CONFLICT(device_id) DO UPDATE SET
-         telemetry_id = excluded.telemetry_id,
-         updated_at   = excluded.updated_at`,
-    );
+  async insertTelemetry(payload: TelemetryPayload, receivedAt: string): Promise<number> {
+    return this.#transaction(async (client) => {
+      await this.#upsertDevice(client, payload.deviceId, payload.firmware, payload.uptimeMs, payload.simulated, receivedAt);
 
-    // One transaction: a sample is either fully recorded with its zones, or
-    // not recorded at all. A partially written sample would show the dashboard
-    // a device with no zone data.
-    this.db.exec('BEGIN IMMEDIATE');
-    try {
-      this.upsertDevice(
-        payload.deviceId,
-        payload.firmware,
-        payload.uptimeMs,
-        payload.simulated,
-        receivedAt,
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO telemetry (device_id, received_at, device_uptime_ms, device_time,
+                                irrigation_state, active_zone, run_ms, pump_on,
+                                controller_status, wifi_connected, rssi, simulated)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         RETURNING id`,
+        [
+          payload.deviceId,
+          receivedAt,
+          payload.uptimeMs,
+          payload.deviceTime,
+          payload.irrigationState,
+          payload.activeZone,
+          payload.runMs,
+          payload.pumpOn ? 1 : 0,
+          payload.controllerStatus,
+          payload.wifiConnected ? 1 : 0,
+          payload.rssi,
+          payload.simulated ? 1 : 0,
+        ],
       );
-
-      const result = insertTelemetry.run(
-        payload.deviceId,
-        receivedAt,
-        payload.uptimeMs,
-        payload.deviceTime,
-        payload.irrigationState,
-        payload.activeZone,
-        payload.runMs,
-        payload.pumpOn ? 1 : 0,
-        payload.controllerStatus,
-        payload.wifiConnected ? 1 : 0,
-        payload.rssi,
-        payload.simulated ? 1 : 0,
-      );
-      const telemetryId = Number(result.lastInsertRowid);
+      const telemetryId = Number(inserted.rows[0]!.id);
 
       for (const zone of payload.zones) {
-        insertZone.run(
-          telemetryId,
-          zone.zone,
-          zone.sensor1,
-          zone.sensor2,
-          zone.sensor1Valid ? 1 : 0,
-          zone.sensor2Valid ? 1 : 0,
-          zone.average,
-          zone.validSensors,
-          zone.valveOpen ? 1 : 0,
+        await client.query(
+          `INSERT INTO telemetry_zone (telemetry_id, zone, sensor_1, sensor_2,
+                                       sensor_1_valid, sensor_2_valid, average,
+                                       valid_sensors, valve_open)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            telemetryId,
+            zone.zone,
+            zone.sensor1,
+            zone.sensor2,
+            zone.sensor1Valid ? 1 : 0,
+            zone.sensor2Valid ? 1 : 0,
+            zone.average,
+            zone.validSensors,
+            zone.valveOpen ? 1 : 0,
+          ],
         );
       }
 
-      upsertState.run(payload.deviceId, telemetryId, receivedAt);
-      this.db.exec('COMMIT');
+      await client.query(
+        `INSERT INTO device_state (device_id, telemetry_id, updated_at)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (device_id) DO UPDATE SET
+           telemetry_id = EXCLUDED.telemetry_id,
+           updated_at   = EXCLUDED.updated_at`,
+        [payload.deviceId, telemetryId, receivedAt],
+      );
+
       return telemetryId;
-    } catch (error) {
-      this.db.exec('ROLLBACK');
-      throw error;
-    }
+    });
   }
 
   /** Latest sample for a device, read from current state rather than history. */
-  getCurrentTelemetry(deviceId: string): TelemetryRow | undefined {
-    return this.db
-      .prepare(
-        `SELECT t.* FROM device_state s
-         JOIN telemetry t ON t.id = s.telemetry_id
-         WHERE s.device_id = ?`,
-      )
-      .get(deviceId) as TelemetryRow | undefined;
+  async getCurrentTelemetry(deviceId: string): Promise<TelemetryRow | undefined> {
+    const result = await this.#query<TelemetryRow & { id: string }>(
+      `SELECT t.* FROM device_state s
+       JOIN telemetry t ON t.id = s.telemetry_id
+       WHERE s.device_id = $1`,
+      [deviceId],
+    );
+    return result.rows[0] === undefined ? undefined : toRow(result.rows[0]);
   }
 
-  getZonesFor(telemetryId: number): ZoneRow[] {
-    return this.db
-      .prepare('SELECT * FROM telemetry_zone WHERE telemetry_id = ? ORDER BY zone')
-      .all(telemetryId) as unknown as ZoneRow[];
+  async getZonesFor(telemetryId: number): Promise<ZoneRow[]> {
+    const result = await this.#query<ZoneRow>(
+      'SELECT * FROM telemetry_zone WHERE telemetry_id = $1 ORDER BY zone',
+      [telemetryId],
+    );
+    return result.rows;
   }
 
-  listTelemetry(deviceId: string, limit: number): TelemetryRow[] {
-    return this.db
-      .prepare(
-        `SELECT * FROM telemetry WHERE device_id = ?
-         ORDER BY received_at DESC, id DESC LIMIT ?`,
-      )
-      .all(deviceId, limit) as unknown as TelemetryRow[];
+  async listTelemetry(deviceId: string, limit: number): Promise<TelemetryRow[]> {
+    const result = await this.#query<TelemetryRow & { id: string }>(
+      `SELECT * FROM telemetry WHERE device_id = $1
+       ORDER BY received_at DESC, id DESC LIMIT $2`,
+      [deviceId, limit],
+    );
+    return result.rows.map(toRow);
   }
 
-  countTelemetry(deviceId: string): number {
-    const row = this.db
-      .prepare('SELECT COUNT(*) AS n FROM telemetry WHERE device_id = ?')
-      .get(deviceId) as { n: number };
-    return row.n;
+  async countTelemetry(deviceId: string): Promise<number> {
+    const result = await this.#query<{ n: string }>(
+      'SELECT COUNT(*) AS n FROM telemetry WHERE device_id = $1',
+      [deviceId],
+    );
+    return Number(result.rows[0]!.n);
   }
 
   /** Deletes telemetry older than the cutoff. Returns rows removed. */
-  pruneTelemetryBefore(cutoffIso: string): number {
+  async pruneTelemetryBefore(cutoffIso: string): Promise<number> {
     // device_state references the newest row per device, so a device that has
     // gone quiet keeps its last known state instead of vanishing from the
     // dashboard entirely.
-    const result = this.db
-      .prepare(
-        `DELETE FROM telemetry
-         WHERE received_at < ?
-           AND id NOT IN (SELECT telemetry_id FROM device_state)`,
-      )
-      .run(cutoffIso);
-    return Number(result.changes);
+    const result = await this.#query(
+      `DELETE FROM telemetry
+       WHERE received_at < $1
+         AND id NOT IN (SELECT telemetry_id FROM device_state)`,
+      [cutoffIso],
+    );
+    return result.rowCount ?? 0;
   }
 
   // -------------------------------------------------------------------------
   // events
   // -------------------------------------------------------------------------
 
-  insertEvent(payload: EventPayload, receivedAt: string): number {
-    this.db.exec('BEGIN IMMEDIATE');
-    try {
-      this.upsertDevice(payload.deviceId, null, payload.uptimeMs, false, receivedAt);
-      const result = this.db
-        .prepare(
-          `INSERT INTO irrigation_events (device_id, received_at, device_uptime_ms,
-                                          type, zone, moisture, duration_ms, detail)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
+  async insertEvent(payload: EventPayload, receivedAt: string): Promise<number> {
+    return this.#transaction(async (client) => {
+      await this.#upsertDevice(client, payload.deviceId, null, payload.uptimeMs, false, receivedAt);
+      const result = await client.query<{ id: string }>(
+        `INSERT INTO irrigation_events (device_id, received_at, device_uptime_ms,
+                                        type, zone, moisture, duration_ms, detail)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id`,
+        [
           payload.deviceId,
           receivedAt,
           payload.uptimeMs,
@@ -306,28 +352,27 @@ export class Repository {
           payload.moisture,
           payload.durationMs,
           payload.detail,
-        );
-      this.db.exec('COMMIT');
-      return Number(result.lastInsertRowid);
-    } catch (error) {
-      this.db.exec('ROLLBACK');
-      throw error;
-    }
+        ],
+      );
+      return Number(result.rows[0]!.id);
+    });
   }
 
-  listEvents(deviceId: string, limit: number): EventRow[] {
-    return this.db
-      .prepare(
-        `SELECT * FROM irrigation_events WHERE device_id = ?
-         ORDER BY received_at DESC, id DESC LIMIT ?`,
-      )
-      .all(deviceId, limit) as unknown as EventRow[];
+  async listEvents(deviceId: string, limit: number): Promise<EventRow[]> {
+    const result = await this.#query<EventRow & { id: string }>(
+      `SELECT * FROM irrigation_events WHERE device_id = $1
+       ORDER BY received_at DESC, id DESC LIMIT $2`,
+      [deviceId, limit],
+    );
+    return result.rows.map(toRow);
   }
 
-  listRecentEvents(limit: number): EventRow[] {
-    return this.db
-      .prepare('SELECT * FROM irrigation_events ORDER BY received_at DESC, id DESC LIMIT ?')
-      .all(limit) as unknown as EventRow[];
+  async listRecentEvents(limit: number): Promise<EventRow[]> {
+    const result = await this.#query<EventRow & { id: string }>(
+      'SELECT * FROM irrigation_events ORDER BY received_at DESC, id DESC LIMIT $1',
+      [limit],
+    );
+    return result.rows.map(toRow);
   }
 
   // -------------------------------------------------------------------------
@@ -339,90 +384,90 @@ export class Repository {
    * for the device. Returns the alert id, or null when it was suppressed as a
    * duplicate.
    */
-  raiseAlert(
+  async raiseAlert(
     deviceId: string,
     type: AlertType,
     severity: AlertSeverity,
     message: string,
     now: string,
-  ): number | null {
-    const existing = this.db
-      .prepare('SELECT id FROM alerts WHERE device_id = ? AND type = ? AND active = 1')
-      .get(deviceId, type) as { id: number } | undefined;
-    if (existing !== undefined) return null;
+  ): Promise<number | null> {
+    const existing = await this.#query<{ id: string }>(
+      'SELECT id FROM alerts WHERE device_id = $1 AND type = $2 AND active = 1',
+      [deviceId, type],
+    );
+    if (existing.rows[0] !== undefined) return null;
 
-    const result = this.db
-      .prepare(
-        `INSERT INTO alerts (device_id, type, severity, message, raised_at, active)
-         VALUES (?, ?, ?, ?, ?, 1)`,
-      )
-      .run(deviceId, type, severity, message, now);
-    return Number(result.lastInsertRowid);
+    const result = await this.#query<{ id: string }>(
+      `INSERT INTO alerts (device_id, type, severity, message, raised_at, active)
+       VALUES ($1, $2, $3, $4, $5, 1)
+       RETURNING id`,
+      [deviceId, type, severity, message, now],
+    );
+    return Number(result.rows[0]!.id);
   }
 
   /** Clears any active alert of this type. Returns how many were cleared. */
-  resolveAlerts(deviceId: string, type: AlertType, now: string): number {
-    const result = this.db
-      .prepare(
-        `UPDATE alerts SET active = 0, resolved_at = ?
-         WHERE device_id = ? AND type = ? AND active = 1`,
-      )
-      .run(now, deviceId, type);
-    return Number(result.changes);
+  async resolveAlerts(deviceId: string, type: AlertType, now: string): Promise<number> {
+    const result = await this.#query(
+      `UPDATE alerts SET active = 0, resolved_at = $1
+       WHERE device_id = $2 AND type = $3 AND active = 1`,
+      [now, deviceId, type],
+    );
+    return result.rowCount ?? 0;
   }
 
-  resolveAlertById(id: number, now: string): boolean {
-    const result = this.db
-      .prepare('UPDATE alerts SET active = 0, resolved_at = ? WHERE id = ? AND active = 1')
-      .run(now, id);
-    return Number(result.changes) > 0;
+  async resolveAlertById(id: number, now: string): Promise<boolean> {
+    const result = await this.#query(
+      'UPDATE alerts SET active = 0, resolved_at = $1 WHERE id = $2 AND active = 1',
+      [now, id],
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
-  listAlerts(activeOnly: boolean, limit: number): AlertRow[] {
+  async listAlerts(activeOnly: boolean, limit: number): Promise<AlertRow[]> {
     const sql = activeOnly
-      ? 'SELECT * FROM alerts WHERE active = 1 ORDER BY raised_at DESC, id DESC LIMIT ?'
-      : 'SELECT * FROM alerts ORDER BY raised_at DESC, id DESC LIMIT ?';
-    return this.db.prepare(sql).all(limit) as unknown as AlertRow[];
+      ? 'SELECT * FROM alerts WHERE active = 1 ORDER BY raised_at DESC, id DESC LIMIT $1'
+      : 'SELECT * FROM alerts ORDER BY raised_at DESC, id DESC LIMIT $1';
+    const result = await this.#query<AlertRow & { id: string }>(sql, [limit]);
+    return result.rows.map(toRow);
   }
 
-  listAlertsForDevice(deviceId: string, activeOnly: boolean, limit: number): AlertRow[] {
+  async listAlertsForDevice(deviceId: string, activeOnly: boolean, limit: number): Promise<AlertRow[]> {
     const sql = activeOnly
-      ? `SELECT * FROM alerts WHERE device_id = ? AND active = 1
-         ORDER BY raised_at DESC, id DESC LIMIT ?`
-      : `SELECT * FROM alerts WHERE device_id = ?
-         ORDER BY raised_at DESC, id DESC LIMIT ?`;
-    return this.db.prepare(sql).all(deviceId, limit) as unknown as AlertRow[];
+      ? `SELECT * FROM alerts WHERE device_id = $1 AND active = 1
+         ORDER BY raised_at DESC, id DESC LIMIT $2`
+      : `SELECT * FROM alerts WHERE device_id = $1
+         ORDER BY raised_at DESC, id DESC LIMIT $2`;
+    const result = await this.#query<AlertRow & { id: string }>(sql, [deviceId, limit]);
+    return result.rows.map(toRow);
   }
 
   // -------------------------------------------------------------------------
   // zone configuration
   // -------------------------------------------------------------------------
 
-  getZoneConfig(deviceId: string): ZoneConfigRow[] {
-    return this.db
-      .prepare('SELECT * FROM zone_config WHERE device_id = ? ORDER BY zone')
-      .all(deviceId) as unknown as ZoneConfigRow[];
+  async getZoneConfig(deviceId: string): Promise<ZoneConfigRow[]> {
+    const result = await this.#query<ZoneConfigRow>(
+      'SELECT * FROM zone_config WHERE device_id = $1 ORDER BY zone',
+      [deviceId],
+    );
+    return result.rows;
   }
 
-  setZoneConfig(deviceId: string, zones: ZoneConfigInput[], now: string): void {
-    const stmt = this.db.prepare(
-      `INSERT INTO zone_config (device_id, zone, start_percent, stop_percent, updated_at)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(device_id, zone) DO UPDATE SET
-         start_percent = excluded.start_percent,
-         stop_percent  = excluded.stop_percent,
-         updated_at    = excluded.updated_at`,
-    );
-    this.db.exec('BEGIN IMMEDIATE');
-    try {
+  async setZoneConfig(deviceId: string, zones: ZoneConfigInput[], now: string): Promise<void> {
+    await this.#transaction(async (client) => {
       for (const zone of zones) {
-        stmt.run(deviceId, zone.zone, zone.startPercent, zone.stopPercent, now);
+        await client.query(
+          `INSERT INTO zone_config (device_id, zone, start_percent, stop_percent, updated_at)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (device_id, zone) DO UPDATE SET
+             start_percent = EXCLUDED.start_percent,
+             stop_percent  = EXCLUDED.stop_percent,
+             updated_at    = EXCLUDED.updated_at`,
+          [deviceId, zone.zone, zone.startPercent, zone.stopPercent, now],
+        );
       }
-      this.db.exec('COMMIT');
-    } catch (error) {
-      this.db.exec('ROLLBACK');
-      throw error;
-    }
+    });
   }
 
   // --- quote requests ------------------------------------------------------
@@ -435,45 +480,46 @@ export class Repository {
    * not leak how many requests exist, and retried on collision because a
    * UNIQUE constraint is the only trustworthy uniqueness check.
    */
-  insertQuoteRequest(
+  async insertQuoteRequest(
     input: QuoteRequestInput,
     now: string,
     makeReference: () => string,
     maxAttempts = 8,
-  ): QuoteRequest {
-    const insertRequest = this.db.prepare(
-      `INSERT INTO quote_requests
-         (reference, created_at, updated_at, status,
-          farm_size, farm_location, irrigation_type, zone_count,
-          full_name, phone, email, notes)
-       VALUES (?, ?, ?, 'NEW', ?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    const insertCapability = this.db.prepare(
-      'INSERT INTO quote_request_capabilities (request_id, capability) VALUES (?, ?)',
-    );
-
+  ): Promise<QuoteRequest> {
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const reference = makeReference();
-      this.db.exec('BEGIN IMMEDIATE');
       try {
-        const result = insertRequest.run(
-          reference,
-          now,
-          now,
-          input.farmSize,
-          input.farmLocation,
-          input.irrigationType,
-          input.zoneCount,
-          input.fullName,
-          input.phone,
-          input.email,
-          input.notes,
-        );
-        const id = Number(result.lastInsertRowid);
-        for (const capability of input.capabilities) {
-          insertCapability.run(id, capability);
-        }
-        this.db.exec('COMMIT');
+        const id = await this.#transaction(async (client) => {
+          const inserted = await client.query<{ id: string }>(
+            `INSERT INTO quote_requests
+               (reference, created_at, updated_at, status,
+                farm_size, farm_location, irrigation_type, zone_count,
+                full_name, phone, email, notes)
+             VALUES ($1, $2, $3, 'NEW', $4, $5, $6, $7, $8, $9, $10, $11)
+             RETURNING id`,
+            [
+              reference,
+              now,
+              now,
+              input.farmSize,
+              input.farmLocation,
+              input.irrigationType,
+              input.zoneCount,
+              input.fullName,
+              input.phone,
+              input.email,
+              input.notes,
+            ],
+          );
+          const requestId = Number(inserted.rows[0]!.id);
+          for (const capability of input.capabilities) {
+            await client.query(
+              'INSERT INTO quote_request_capabilities (request_id, capability) VALUES ($1, $2)',
+              [requestId, capability],
+            );
+          }
+          return requestId;
+        });
 
         return {
           id,
@@ -492,13 +538,9 @@ export class Repository {
           capabilities: input.capabilities,
         };
       } catch (error) {
-        this.db.exec('ROLLBACK');
         // Only a reference collision is worth retrying; anything else is a
         // real failure and must surface.
-        const message = error instanceof Error ? error.message : String(error);
-        if (!/UNIQUE constraint failed: quote_requests.reference/.test(message)) {
-          throw error;
-        }
+        if (!isUniqueViolation(error)) throw error;
       }
     }
     throw new Error(`could not allocate a unique request reference in ${maxAttempts} attempts`);
@@ -509,54 +551,57 @@ export class Repository {
    * request reads the same however it was fetched — and so the UI always lists
    * the capability that actually ships today first.
    */
-  getCapabilitiesFor(requestId: number): Capability[] {
-    const stored = new Set(
-      (
-        this.db
-          .prepare('SELECT capability FROM quote_request_capabilities WHERE request_id = ?')
-          .all(requestId) as unknown as { capability: Capability }[]
-      ).map((row) => row.capability),
+  async getCapabilitiesFor(requestId: number): Promise<Capability[]> {
+    const result = await this.#query<{ capability: Capability }>(
+      'SELECT capability FROM quote_request_capabilities WHERE request_id = $1',
+      [requestId],
     );
+    const stored = new Set(result.rows.map((row) => row.capability));
     return CAPABILITIES.filter((capability) => stored.has(capability));
   }
 
-  getQuoteRequestByReference(reference: string): QuoteRequest | undefined {
-    const row = this.db
-      .prepare('SELECT * FROM quote_requests WHERE reference = ?')
-      .get(reference) as unknown as QuoteRequestRow | undefined;
-    if (row === undefined) return undefined;
-    return { ...row, capabilities: this.getCapabilitiesFor(row.id) };
+  async getQuoteRequestByReference(reference: string): Promise<QuoteRequest | undefined> {
+    const result = await this.#query<QuoteRequestRow & { id: string }>(
+      'SELECT * FROM quote_requests WHERE reference = $1',
+      [reference],
+    );
+    if (result.rows[0] === undefined) return undefined;
+    const row = toRow(result.rows[0]);
+    return { ...row, capabilities: await this.getCapabilitiesFor(row.id) };
   }
 
-  listQuoteRequests(limit: number, status?: RequestStatus): QuoteRequest[] {
-    const rows = (
+  async listQuoteRequests(limit: number, status?: RequestStatus): Promise<QuoteRequest[]> {
+    const result =
       status === undefined
-        ? this.db
-            .prepare('SELECT * FROM quote_requests ORDER BY created_at DESC, id DESC LIMIT ?')
-            .all(limit)
-        : this.db
-            .prepare(
-              'SELECT * FROM quote_requests WHERE status = ? ORDER BY created_at DESC, id DESC LIMIT ?',
-            )
-            .all(status, limit)
-    ) as unknown as QuoteRequestRow[];
+        ? await this.#query<QuoteRequestRow & { id: string }>(
+            'SELECT * FROM quote_requests ORDER BY created_at DESC, id DESC LIMIT $1',
+            [limit],
+          )
+        : await this.#query<QuoteRequestRow & { id: string }>(
+            'SELECT * FROM quote_requests WHERE status = $1 ORDER BY created_at DESC, id DESC LIMIT $2',
+            [status, limit],
+          );
 
-    return rows.map((row) => ({ ...row, capabilities: this.getCapabilitiesFor(row.id) }));
+    const rows = result.rows.map(toRow);
+    return Promise.all(
+      rows.map(async (row) => ({ ...row, capabilities: await this.getCapabilitiesFor(row.id) })),
+    );
   }
 
-  countQuoteRequestsByStatus(): Record<string, number> {
-    const rows = this.db
-      .prepare('SELECT status, COUNT(*) AS n FROM quote_requests GROUP BY status')
-      .all() as unknown as { status: string; n: number }[];
+  async countQuoteRequestsByStatus(): Promise<Record<string, number>> {
+    const result = await this.#query<{ status: string; n: string }>(
+      'SELECT status, COUNT(*) AS n FROM quote_requests GROUP BY status',
+    );
     const out: Record<string, number> = {};
-    for (const row of rows) out[row.status] = row.n;
+    for (const row of result.rows) out[row.status] = Number(row.n);
     return out;
   }
 
-  updateQuoteRequestStatus(reference: string, status: RequestStatus, now: string): boolean {
-    const result = this.db
-      .prepare('UPDATE quote_requests SET status = ?, updated_at = ? WHERE reference = ?')
-      .run(status, now, reference);
-    return Number(result.changes) > 0;
+  async updateQuoteRequestStatus(reference: string, status: RequestStatus, now: string): Promise<boolean> {
+    const result = await this.#query(
+      'UPDATE quote_requests SET status = $1, updated_at = $2 WHERE reference = $3',
+      [status, now, reference],
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 }

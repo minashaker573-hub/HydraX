@@ -70,7 +70,8 @@ All environment variables. `src/config.ts` is the only module that reads
 | `HYDRAX_ALLOW_INSECURE` | `false` | Set `true` to run without a device key. Local development only. |
 | `HYDRAX_HOST` | `0.0.0.0` | Bind address |
 | `HYDRAX_PORT` | `8080` | Port |
-| `HYDRAX_DB_PATH` | `backend/data/hydrax.db` | SQLite file |
+| `HYDRAX_DATABASE_URL` | *(none)* | Postgres connection string (Supabase Session pooler URI). **Required.** |
+| `HYDRAX_ALLOWED_ORIGIN` | *(none)* | CORS origin allowed to call `POST /api/v1/requests` cross-origin. Only needed when the website is deployed separately — see [DEPLOYMENT.md](DEPLOYMENT.md). |
 | `HYDRAX_DASHBOARD_DIR` | `dashboard/` | Dashboard, mounted at `/dashboard` |
 | `HYDRAX_WEBSITE_DIR` | `website/` | Public website, mounted at `/` |
 | `HYDRAX_ADMIN_DIR` | `admin/` | Operator console, mounted at `/admin` |

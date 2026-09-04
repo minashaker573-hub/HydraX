@@ -3,13 +3,14 @@
 ## Why this isn't a single "deploy" button
 
 The backend (`backend/`) is one long-running Node process: a plain
-`http.createServer`, a SQLite file on disk, an in-memory rate limiter, and two
-`setInterval` background jobs (offline-device sweep, telemetry retention
-pruning). That combination needs a host that keeps a process alive and gives
-it a writable disk. It **cannot** run on a serverless/edge platform like
-Vercel — those spin a function up per request and throw the instance away
-afterward, so the database would reset (or simply not exist) on every cold
-start, and the background jobs would never fire.
+`http.createServer`, an in-memory rate limiter, and two `setInterval`
+background jobs (offline-device sweep, telemetry retention pruning). The
+database itself — Postgres, hosted on Supabase — is not the obstacle; it's
+reachable from anywhere over the network. The *process* is: it **cannot** run
+on a serverless/edge platform like Vercel, which spins a function up per
+request and throws the instance away afterward, so the in-memory rate limiter
+would reset on every invocation and the background jobs would never fire —
+nothing stays alive long enough to run them.
 
 Two supported shapes:
 
@@ -31,13 +32,11 @@ runs a long-lived Node process at `backend/`:
 - **Root directory**: `backend`
 - **Node version**: ≥ 22.6 (see `backend/package.json` → `engines`)
 - **Required env vars**: `HYDRAX_DEVICE_KEY`, `HYDRAX_ADMIN_KEY` (distinct
-  values — the server refuses to start otherwise)
-- **Persistent disk**: mount one at the path `HYDRAX_DB_PATH` points at (or
-  leave the default `backend/data/hydrax.db` and mount the disk at
-  `backend/data`), or every restart starts from an empty database. HYDRAX has
-  no real field deployment yet, so this is a "when it matters" concern, not a
-  launch blocker — but it does mean quote requests submitted before a
-  redeploy will be gone after one on a host without a persistent disk.
+  values — the server refuses to start otherwise), `HYDRAX_DATABASE_URL`
+  (Supabase's Session pooler connection string — see
+  [CONFIGURATION.md](CONFIGURATION.md))
+- **No persistent disk needed.** The database is hosted on Supabase, not on
+  this host's filesystem — a redeploy or restart does not touch stored data.
 
 Website, dashboard (`/dashboard`) and admin (`/admin`) are all served by this
 one process, at this one origin — nothing else to configure.

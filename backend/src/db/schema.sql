@@ -1,4 +1,4 @@
--- HYDRAX / SmartFarm Guardian - Phase 1 schema.
+-- HYDRAX / SmartFarm Guardian - Phase 1 schema (PostgreSQL / Supabase).
 --
 -- Four concepts, as scoped: Device, Telemetry, IrrigationEvent, Alert.
 --
@@ -11,9 +11,16 @@
 -- The device contributes `device_uptime_ms` (monotonic since boot) and, when
 -- NTP has actually synced, `device_time`. The server clock is the timeline;
 -- see docs/TELEMETRY.md.
-
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
+--
+-- Booleans are stored as INTEGER (0/1), not native BOOLEAN, deliberately: the
+-- application code above this schema was written for SQLite's integer
+-- semantics, and keeping the same encoding here made the SQLite -> Postgres
+-- migration a schema/driver change, not a rewrite of every comparison in
+-- routes/*.ts and repository.ts. See docs/CONFIGURATION.md.
+--
+-- Every statement is idempotent (IF NOT EXISTS / ON CONFLICT), applied on
+-- every server boot rather than through a separate migration step — the same
+-- design the SQLite version used.
 
 CREATE TABLE IF NOT EXISTS devices (
     device_id      TEXT PRIMARY KEY,
@@ -25,7 +32,7 @@ CREATE TABLE IF NOT EXISTS devices (
 );
 
 CREATE TABLE IF NOT EXISTS telemetry (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    id                BIGSERIAL PRIMARY KEY,
     device_id         TEXT NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE,
     received_at       TEXT NOT NULL,
     device_uptime_ms  INTEGER NOT NULL,
@@ -44,7 +51,7 @@ CREATE INDEX IF NOT EXISTS idx_telemetry_device_time
     ON telemetry (device_id, received_at DESC);
 
 CREATE TABLE IF NOT EXISTS telemetry_zone (
-    telemetry_id   INTEGER NOT NULL REFERENCES telemetry(id) ON DELETE CASCADE,
+    telemetry_id   BIGINT NOT NULL REFERENCES telemetry(id) ON DELETE CASCADE,
     zone           INTEGER NOT NULL,
     sensor_1       REAL,
     sensor_2       REAL,
@@ -59,12 +66,12 @@ CREATE TABLE IF NOT EXISTS telemetry_zone (
 -- Current state: one row per device, pointing at its most recent sample.
 CREATE TABLE IF NOT EXISTS device_state (
     device_id    TEXT PRIMARY KEY REFERENCES devices(device_id) ON DELETE CASCADE,
-    telemetry_id INTEGER NOT NULL REFERENCES telemetry(id) ON DELETE CASCADE,
+    telemetry_id BIGINT NOT NULL REFERENCES telemetry(id) ON DELETE CASCADE,
     updated_at   TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS irrigation_events (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    id               BIGSERIAL PRIMARY KEY,
     device_id        TEXT NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE,
     received_at      TEXT NOT NULL,
     device_uptime_ms INTEGER NOT NULL,
@@ -79,7 +86,7 @@ CREATE INDEX IF NOT EXISTS idx_events_device_time
     ON irrigation_events (device_id, received_at DESC);
 
 CREATE TABLE IF NOT EXISTS alerts (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    id          BIGSERIAL PRIMARY KEY,
     device_id   TEXT NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE,
     type        TEXT NOT NULL,
     severity    TEXT NOT NULL,
@@ -90,7 +97,8 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 
 -- At most one active alert per (device, type): a flapping sensor must not
--- produce thousands of duplicate rows.
+-- produce thousands of duplicate rows. Postgres supports partial unique
+-- indexes with the identical syntax SQLite used here.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_alerts_active_unique
     ON alerts (device_id, type) WHERE active = 1;
 
@@ -117,7 +125,7 @@ CREATE TABLE IF NOT EXISTS zone_config (
 -- `reference` is the customer-facing identifier (HYX-XXXXXX). It is UNIQUE and
 -- generated with a collision retry, so it can be quoted over the phone.
 CREATE TABLE IF NOT EXISTS quote_requests (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    id              BIGSERIAL PRIMARY KEY,
     reference       TEXT NOT NULL UNIQUE,
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL,
@@ -145,7 +153,7 @@ CREATE INDEX IF NOT EXISTS idx_requests_status
 -- be counted and filtered. A row here means the customer expressed interest —
 -- not that the capability ships today.
 CREATE TABLE IF NOT EXISTS quote_request_capabilities (
-    request_id INTEGER NOT NULL REFERENCES quote_requests(id) ON DELETE CASCADE,
+    request_id BIGINT NOT NULL REFERENCES quote_requests(id) ON DELETE CASCADE,
     capability TEXT NOT NULL,
     PRIMARY KEY (request_id, capability)
 );

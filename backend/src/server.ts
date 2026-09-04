@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 import { createApp } from './app.ts';
 import { ConfigError, loadConfig } from './config.ts';
-import { openDatabase } from './db/index.ts';
+import { closeDatabase, openDatabase } from './db/index.ts';
 import { Repository } from './db/repository.ts';
 import { sweepOfflineDevices } from './domain/alerts.ts';
 import { log } from './log.ts';
@@ -21,11 +21,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const BACKEND_ROOT = resolve(HERE, '..');
 const PROJECT_ROOT = resolve(BACKEND_ROOT, '..');
 
-function main(): void {
+async function main(): Promise<void> {
   let config;
   try {
     config = loadConfig(process.env, {
-      dbPath: join(BACKEND_ROOT, 'data', 'hydrax.db'),
       dashboardDir: join(PROJECT_ROOT, 'dashboard'),
       websiteDir: join(PROJECT_ROOT, 'website'),
       adminDir: join(PROJECT_ROOT, 'admin'),
@@ -46,7 +45,7 @@ function main(): void {
     );
   }
 
-  const db = openDatabase(config.dbPath);
+  const db = await openDatabase(config.databaseUrl);
   const repo = new Repository(db);
   const deps: AppDeps = { repo, config, now: () => Date.now() };
 
@@ -56,27 +55,29 @@ function main(): void {
   // A device that stops reporting must surface as an alert on its own; nobody
   // is watching the dashboard at 3am waiting for a row to go stale.
   const offlineTimer = setInterval(() => {
-    try {
-      sweepOfflineDevices(repo, config.offlineTimeoutMs, Date.now());
-    } catch (error) {
-      log.error('sweep', `offline sweep failed: ${(error as Error).message}`);
-    }
+    void (async () => {
+      try {
+        await sweepOfflineDevices(repo, config.offlineTimeoutMs, Date.now());
+      } catch (error) {
+        log.error('sweep', `offline sweep failed: ${(error as Error).message}`);
+      }
+    })();
   }, config.offlineSweepIntervalMs);
   offlineTimer.unref();
 
   let retentionTimer: NodeJS.Timeout | undefined;
   if (config.retentionDays > 0) {
-    const pruneOnce = (): void => {
+    const pruneOnce = async (): Promise<void> => {
       try {
         const cutoff = new Date(Date.now() - config.retentionDays * 86_400_000).toISOString();
-        const removed = repo.pruneTelemetryBefore(cutoff);
+        const removed = await repo.pruneTelemetryBefore(cutoff);
         if (removed > 0) log.info('retention', `pruned ${removed} telemetry rows before ${cutoff}`);
       } catch (error) {
         log.error('retention', `prune failed: ${(error as Error).message}`);
       }
     };
-    pruneOnce();
-    retentionTimer = setInterval(pruneOnce, 6 * 60 * 60 * 1000);
+    void pruneOnce();
+    retentionTimer = setInterval(() => void pruneOnce(), 6 * 60 * 60 * 1000);
     retentionTimer.unref();
   }
 
@@ -92,8 +93,7 @@ function main(): void {
     clearInterval(offlineTimer);
     if (retentionTimer !== undefined) clearInterval(retentionTimer);
     server.close(() => {
-      db.close();
-      process.exit(0);
+      void closeDatabase(db).finally(() => process.exit(0));
     });
     // Do not hang forever on a stuck connection.
     setTimeout(() => process.exit(1), 5000).unref();
@@ -103,4 +103,7 @@ function main(): void {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-main();
+main().catch((error: unknown) => {
+  log.error('server', `fatal startup error: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+});

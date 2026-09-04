@@ -32,7 +32,7 @@ flowchart TD
     HW --> V2[Zone 2 valve]
 
     TEL -.->|HTTP, background task| BE[Backend]
-    BE --> DB[(SQLite)]
+    BE --> DB[(Postgres)]
     BE --> DASH[Dashboard]
 
     style CTRL fill:#0f6fd1,color:#fff

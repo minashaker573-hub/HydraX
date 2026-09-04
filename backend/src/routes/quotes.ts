@@ -110,7 +110,7 @@ export function registerQuoteRoutes(router: Router, deps: AppDeps): void {
       return;
     }
 
-    const created = deps.repo.insertQuoteRequest(
+    const created = await deps.repo.insertQuoteRequest(
       result.value,
       nowIso(deps),
       makeRequestReference,
@@ -133,7 +133,7 @@ export function registerQuoteRoutes(router: Router, deps: AppDeps): void {
   });
 
   // ------------------------------------------------------------------- admin
-  router.get('/api/v1/requests', (ctx) => {
+  router.get('/api/v1/requests', async (ctx) => {
     if (!authorizeAdmin(ctx, deps)) return;
 
     const limit = readLimit(ctx.url, 'limit', 50, MAX_PAGE);
@@ -148,13 +148,14 @@ export function registerQuoteRoutes(router: Router, deps: AppDeps): void {
       status = statusParam as RequestStatus;
     }
 
-    sendJson(ctx.res, 200, {
-      counts: deps.repo.countQuoteRequestsByStatus(),
-      requests: deps.repo.listQuoteRequests(limit, status).map(serialize),
-    });
+    const [counts, requests] = await Promise.all([
+      deps.repo.countQuoteRequestsByStatus(),
+      deps.repo.listQuoteRequests(limit, status),
+    ]);
+    sendJson(ctx.res, 200, { counts, requests: requests.map(serialize) });
   });
 
-  router.get('/api/v1/requests/:reference', (ctx) => {
+  router.get('/api/v1/requests/:reference', async (ctx) => {
     if (!authorizeAdmin(ctx, deps)) return;
 
     const reference = normalizeReference(ctx.params.reference!);
@@ -163,7 +164,7 @@ export function registerQuoteRoutes(router: Router, deps: AppDeps): void {
       return;
     }
 
-    const request = deps.repo.getQuoteRequestByReference(reference);
+    const request = await deps.repo.getQuoteRequestByReference(reference);
     if (request === undefined) {
       sendError(ctx.res, 404, `no request with reference ${reference}`);
       return;
@@ -203,13 +204,13 @@ export function registerQuoteRoutes(router: Router, deps: AppDeps): void {
       return;
     }
 
-    if (!deps.repo.updateQuoteRequestStatus(reference, status, nowIso(deps))) {
+    if (!(await deps.repo.updateQuoteRequestStatus(reference, status, nowIso(deps)))) {
       sendError(ctx.res, 404, `no request with reference ${reference}`);
       return;
     }
 
     log.info('requests', `${reference} -> ${status}`);
-    const updated = deps.repo.getQuoteRequestByReference(reference)!;
+    const updated = (await deps.repo.getQuoteRequestByReference(reference))!;
     sendJson(ctx.res, 200, serialize(updated));
   });
 }

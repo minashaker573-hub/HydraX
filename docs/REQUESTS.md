@@ -3,7 +3,7 @@
 From the public website to an operator status update.
 
 ```
-website  →  /request  →  POST /api/v1/requests  →  SQLite  →  confirmation (HYX-XXXXXX)
+website  →  /request  →  POST /api/v1/requests  →  Postgres  →  confirmation (HYX-XXXXXX)
                                                       ↓
                                           /admin  →  operator console  →  status update
 ```

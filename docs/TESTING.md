@@ -93,17 +93,42 @@ leaves an empty string rather than a half-written payload.
 
 ## Backend tests
 
-117 tests. Runs a real HTTP server on a real socket with an in-memory database.
+123 tests. Runs a real HTTP server on a real socket, against a real Postgres
+database (Supabase) — not an in-memory one. `HYDRAX_TEST_DATABASE_URL` (or
+`HYDRAX_DATABASE_URL`) must be set; `npm test` loads `.env` automatically if
+one exists (`node --env-file-if-exists=.env`, no dotenv dependency). Point it
+at a throwaway/dev Supabase project, not production — the suite creates and
+drops Postgres schemas freely.
 
 ```bash
 cd backend
 npm install
+cp .env.example .env   # then fill in HYDRAX_DATABASE_URL
 npm test
 npm run typecheck
 npm run check:dashboard
 npm run check:website
 npm run check:admin
 ```
+
+### Why a real database, and what that costs
+
+Every `startHarness()` call gets its own Postgres **schema** — created fresh,
+dropped when the harness closes — inside the database `HYDRAX_DATABASE_URL`
+points at. That is the direct equivalent of the isolation SQLite's `:memory:`
+gave every test for free, adapted to a shared server: two tests never see
+each other's rows.
+
+All harnesses in one test *file* share a single small connection pool (see
+`test/helpers.ts`) rather than opening one each — a free-tier Postgres
+instance has a low absolute connection ceiling, and this suite creates well
+over a hundred harnesses across all files.
+
+The real, disclosed cost: `npm test` now needs network access to a live
+Postgres instance, and runs in on the order of a minute rather than a few
+seconds — every query is a real network round trip instead of an in-process
+call. There is no offline fallback; a database-less "unit-only" run is not
+currently provided.
 
 ### Coverage
 
@@ -123,7 +148,12 @@ while current state tracks the newest sample; simulated flag preserved; event
 ingestion; 404s for unknown devices; device listing; offline transition via an
 injected clock; zone config round-trip flagged `applied_by_device: false`; 405
 vs 404 routing; dashboard served for non-API paths; **path traversal rejected**;
-the aggregate dashboard payload.
+the aggregate dashboard payload; branded 404 page for an unknown public path.
+
+**CORS** (public quote endpoint only) — same-origin deployment sends no CORS
+headers at all; a configured `HYDRAX_ALLOWED_ORIGIN` gets the allow header on
+both success and error responses; a non-matching origin gets nothing; the
+OPTIONS preflight answers with the right allow-methods/allow-headers.
 
 **Alerts** — raised on `SENSOR_ERROR`; not duplicated while already open;
 auto-resolved when the condition clears; `SENSOR_RECOVERED` clears;
@@ -179,8 +209,8 @@ Verified honestly — these are **not** covered by automated tests:
 6. **Dashboard verified against the mock device only.** Its checks cover parsing,
    imports and safe rendering, not visual regression, and no real sensor data
    has ever flowed through the UI.
-7. **No concurrency/load testing.** SQLite in WAL mode with a handful of devices
-   is comfortable, but this has not been measured.
+7. **No concurrency/load testing.** Postgres with a handful of devices and a
+   small connection pool is comfortable, but this has not been measured.
 8. **Backend runs over plain HTTP.** TLS termination is left to a reverse proxy.
 
 ---

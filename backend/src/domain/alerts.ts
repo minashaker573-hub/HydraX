@@ -27,18 +27,18 @@ export function isOnline(lastSeenAt: string, offlineTimeoutMs: number, nowMs: nu
  * its alert, otherwise the dashboard fills with stale red that operators learn
  * to ignore.
  */
-export function applyTelemetryAlerts(
+export async function applyTelemetryAlerts(
   repo: Repository,
   payload: TelemetryPayload,
   now: string,
-): void {
+): Promise<void> {
   const { deviceId, controllerStatus } = payload;
 
   // Hearing from the device at all means it is not offline.
-  repo.resolveAlerts(deviceId, 'DEVICE_OFFLINE', now);
+  await repo.resolveAlerts(deviceId, 'DEVICE_OFFLINE', now);
 
   if (controllerStatus === 'SENSOR_ERROR') {
-    const id = repo.raiseAlert(
+    const id = await repo.raiseAlert(
       deviceId,
       'SENSOR_ERROR',
       'critical',
@@ -47,11 +47,11 @@ export function applyTelemetryAlerts(
     );
     if (id !== null) log.warn('alerts', `${deviceId}: sensor error raised`);
   } else {
-    repo.resolveAlerts(deviceId, 'SENSOR_ERROR', now);
+    await repo.resolveAlerts(deviceId, 'SENSOR_ERROR', now);
   }
 
   if (controllerStatus === 'ACTUATOR_ERROR') {
-    const id = repo.raiseAlert(
+    const id = await repo.raiseAlert(
       deviceId,
       'ACTUATOR_ERROR',
       'critical',
@@ -60,18 +60,18 @@ export function applyTelemetryAlerts(
     );
     if (id !== null) log.error('alerts', `${deviceId}: actuator error raised`);
   } else {
-    repo.resolveAlerts(deviceId, 'ACTUATOR_ERROR', now);
+    await repo.resolveAlerts(deviceId, 'ACTUATOR_ERROR', now);
   }
 }
 
 /** Reconciles alerts against a controller event. */
-export function applyEventAlerts(repo: Repository, payload: EventPayload, now: string): void {
+export async function applyEventAlerts(repo: Repository, payload: EventPayload, now: string): Promise<void> {
   const { deviceId, type, zone } = payload;
   const where = zone === null ? '' : ` on zone ${zone}`;
 
   switch (type) {
     case 'IRRIGATION_TIMEOUT':
-      repo.raiseAlert(
+      await repo.raiseAlert(
         deviceId,
         'IRRIGATION_TIMEOUT',
         'critical',
@@ -85,11 +85,11 @@ export function applyEventAlerts(repo: Repository, payload: EventPayload, now: s
     case 'IRRIGATION_STOPPED':
       // A run that completed normally shows the previous timeout is no longer
       // the current condition.
-      repo.resolveAlerts(deviceId, 'IRRIGATION_TIMEOUT', now);
+      await repo.resolveAlerts(deviceId, 'IRRIGATION_TIMEOUT', now);
       break;
 
     case 'SENSOR_ERROR':
-      repo.raiseAlert(
+      await repo.raiseAlert(
         deviceId,
         'SENSOR_ERROR',
         'critical',
@@ -99,11 +99,11 @@ export function applyEventAlerts(repo: Repository, payload: EventPayload, now: s
       break;
 
     case 'SENSOR_RECOVERED':
-      repo.resolveAlerts(deviceId, 'SENSOR_ERROR', now);
+      await repo.resolveAlerts(deviceId, 'SENSOR_ERROR', now);
       break;
 
     case 'ACTUATOR_ERROR':
-      repo.raiseAlert(
+      await repo.raiseAlert(
         deviceId,
         'ACTUATOR_ERROR',
         'critical',
@@ -113,7 +113,7 @@ export function applyEventAlerts(repo: Repository, payload: EventPayload, now: s
       break;
 
     case 'FAULT_CLEARED':
-      repo.resolveAlerts(deviceId, 'ACTUATOR_ERROR', now);
+      await repo.resolveAlerts(deviceId, 'ACTUATOR_ERROR', now);
       break;
 
     default:
@@ -125,19 +125,19 @@ export function applyEventAlerts(repo: Repository, payload: EventPayload, now: s
  * Raises DEVICE_OFFLINE for every device that has gone quiet.
  * Returns the number of alerts newly raised.
  */
-export function sweepOfflineDevices(
+export async function sweepOfflineDevices(
   repo: Repository,
   offlineTimeoutMs: number,
   nowMs: number,
-): number {
+): Promise<number> {
   const now = new Date(nowMs).toISOString();
   let raised = 0;
 
-  for (const device of repo.listDevices()) {
+  for (const device of await repo.listDevices()) {
     if (isOnline(device.last_seen_at, offlineTimeoutMs, nowMs)) continue;
 
     const silentForS = Math.round((nowMs - Date.parse(device.last_seen_at)) / 1000);
-    const id = repo.raiseAlert(
+    const id = await repo.raiseAlert(
       device.device_id,
       'DEVICE_OFFLINE',
       'warning',

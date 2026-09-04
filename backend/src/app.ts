@@ -23,11 +23,12 @@ export type RequestListener = (req: IncomingMessage, res: ServerResponse) => voi
 export function createRouter(deps: AppDeps): Router {
   const router = new Router();
 
-  router.get('/health', (ctx) => {
+  router.get('/health', async (ctx) => {
+    const devices = await deps.repo.listDevices();
     sendJson(ctx.res, 200, {
       status: 'ok',
       time: new Date(deps.now()).toISOString(),
-      devices: deps.repo.listDevices().length,
+      devices: devices.length,
     });
   });
 

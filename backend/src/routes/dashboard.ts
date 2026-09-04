@@ -16,16 +16,16 @@ const DEFAULT_EVENT_LIMIT = 15;
 const MAX_EVENT_LIMIT = 100;
 
 export function registerDashboardRoutes(router: Router, deps: AppDeps): void {
-  router.get('/api/v1/dashboard', (ctx) => {
+  router.get('/api/v1/dashboard', async (ctx) => {
     const nowMs = deps.now();
     const eventLimit = readLimit(ctx.url, 'events', DEFAULT_EVENT_LIMIT, MAX_EVENT_LIMIT);
 
-    const devices = deps.repo.listDevices().map((device) => {
-      const current = deps.repo.getCurrentTelemetry(device.device_id);
-      const zoneRows = current === undefined ? [] : deps.repo.getZonesFor(current.id);
-      const configByZone = new Map(
-        deps.repo.getZoneConfig(device.device_id).map((row) => [row.zone, row]),
-      );
+    const deviceRows = await deps.repo.listDevices();
+    const devices = await Promise.all(deviceRows.map(async (device) => {
+      const current = await deps.repo.getCurrentTelemetry(device.device_id);
+      const zoneRows = current === undefined ? [] : await deps.repo.getZonesFor(current.id);
+      const zoneConfigRows = await deps.repo.getZoneConfig(device.device_id);
+      const configByZone = new Map(zoneConfigRows.map((row) => [row.zone, row]));
 
       return {
         device_id: device.device_id,
@@ -70,12 +70,10 @@ export function registerDashboardRoutes(router: Router, deps: AppDeps): void {
                 : { start_percent: config.start_percent, stop_percent: config.stop_percent },
           };
         }),
-        alerts: deps.repo
-          .listAlertsForDevice(device.device_id, true, 20)
-          .map(serializeAlert),
-        events: deps.repo.listEvents(device.device_id, eventLimit),
+        alerts: (await deps.repo.listAlertsForDevice(device.device_id, true, 20)).map(serializeAlert),
+        events: await deps.repo.listEvents(device.device_id, eventLimit),
       };
-    });
+    }));
 
     sendJson(ctx.res, 200, { generated_at: nowIso(deps), devices });
   });

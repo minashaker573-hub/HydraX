@@ -1,14 +1,35 @@
 /**
- * Shared test scaffolding: an in-memory backend and a valid telemetry builder.
+ * Shared test scaffolding: a real Postgres-backed backend, isolated per test,
+ * and a valid telemetry builder.
+ *
+ * One connection pool is shared by every harness in a test *file* (node:test
+ * runs separate files in separate processes, so "per file" is the natural
+ * granularity — see `pool()` below), kept small and short-lived per
+ * connection. A hosted free-tier Postgres instance has a low absolute
+ * connection ceiling; one pool per harness — this suite creates well over a
+ * hundred harnesses across all files — exhausted it immediately. One shared
+ * pool per file does not.
+ *
+ * Each `startHarness()` call still gets its own Postgres *schema* — created
+ * fresh, dropped on `close()` — so tests stay exactly as isolated as the old
+ * SQLite `:memory:` database made them for free: two tests never see each
+ * other's rows, and nothing written during a run lingers afterward. See
+ * Repository's `#query`/`#transaction` in src/db/repository.ts for how a
+ * shared pool and per-harness schema isolation coexist safely.
+ *
+ * This does mean `npm test` now needs network access to a real Postgres
+ * instance and runs slower than the old fully-offline suite — a real,
+ * disclosed tradeoff of moving off SQLite. See docs/TESTING.md.
  */
 
+import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createApp } from '../src/app.ts';
-import { openDatabase } from '../src/db/index.ts';
+import { createPool, dropSchema, provisionSchema, type Db } from '../src/db/index.ts';
 import { Repository } from '../src/db/repository.ts';
 import { setLogSilent } from '../src/log.ts';
 import type { Config } from '../src/config.ts';
@@ -18,6 +39,33 @@ setLogSilent(true);
 
 export const TEST_KEY = 'test-device-key';
 export const TEST_ADMIN_KEY = 'test-admin-key';
+
+const TEST_DATABASE_URL = process.env.HYDRAX_TEST_DATABASE_URL ?? process.env.HYDRAX_DATABASE_URL;
+if (!TEST_DATABASE_URL) {
+  throw new Error(
+    'HYDRAX_TEST_DATABASE_URL (or HYDRAX_DATABASE_URL) is not set. The test suite needs a ' +
+      "Postgres connection string — Supabase's Session pooler URI — to run against. See " +
+      'docs/TESTING.md.',
+  );
+}
+
+// One pool per test file, shared by every startHarness() call in this
+// file's process. Deliberately never explicitly closed: each test file's own
+// after() hook (see api.test.ts, alerts.test.ts, quotes.test.ts) already
+// closes every harness it created, and node:test runs separate files in
+// separate processes — so there is no "next file" this pool could leak into.
+// Its connections self-close via idleTimeoutMillis (see createPool), and the
+// process exits once nothing is left holding the event loop open.
+//
+// An explicit after() here to end() the pool was tried and removed: called
+// from inside a test (which is when a lazily-created pool first exists),
+// node:test scopes that hook to the *current test*, not the file — it fired
+// after the first test instead of the last, closing the pool while later
+// tests in the same file still needed it.
+const sharedPool: Db = createPool(TEST_DATABASE_URL!);
+function pool(): Db {
+  return sharedPool;
+}
 
 export interface Harness {
   readonly repo: Repository;
@@ -32,7 +80,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     host: '127.0.0.1',
     port: 0,
-    dbPath: ':memory:',
+    databaseUrl: TEST_DATABASE_URL!,
     deviceKey: TEST_KEY,
     adminKey: TEST_ADMIN_KEY,
     offlineTimeoutMs: 60_000,
@@ -51,8 +99,11 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
 }
 
 export async function startHarness(configOverrides: Partial<Config> = {}): Promise<Harness> {
-  const db = openDatabase(':memory:');
-  const repo = new Repository(db);
+  // Postgres schema names cannot start with a digit or contain hyphens.
+  const schema = `test_${randomUUID().replaceAll('-', '_')}`;
+  const db = pool();
+  await provisionSchema(db, schema);
+  const repo = new Repository(db, schema);
   const config = testConfig(configOverrides);
 
   let nowMs = Date.parse('2026-01-01T00:00:00.000Z');
@@ -73,7 +124,9 @@ export async function startHarness(configOverrides: Partial<Config> = {}): Promi
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),
       );
-      db.close();
+      // The pool is shared by the whole file (see pool() above) and is
+      // closed once, in its own after() hook — not here.
+      await dropSchema(db, schema);
     },
   };
 }

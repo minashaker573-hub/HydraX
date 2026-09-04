@@ -24,16 +24,15 @@ export function serializeAlert(alert: AlertRow): Record<string, unknown> {
 }
 
 export function registerAlertRoutes(router: Router, deps: AppDeps): void {
-  router.get('/api/v1/alerts', (ctx) => {
+  router.get('/api/v1/alerts', async (ctx) => {
     // Active-only by default: the dashboard wants what is wrong now.
     const activeOnly = ctx.url.searchParams.get('active') !== 'false';
     const limit = readLimit(ctx.url, 'limit', 100, MAX_PAGE);
-    sendJson(ctx.res, 200, {
-      alerts: deps.repo.listAlerts(activeOnly, limit).map(serializeAlert),
-    });
+    const alerts = await deps.repo.listAlerts(activeOnly, limit);
+    sendJson(ctx.res, 200, { alerts: alerts.map(serializeAlert) });
   });
 
-  router.post('/api/v1/alerts/:id/resolve', (ctx) => {
+  router.post('/api/v1/alerts/:id/resolve', async (ctx) => {
     // Silencing a critical alert is an operator decision, not a public one.
     if (!authorizeAdmin(ctx, deps)) return;
 
@@ -42,7 +41,7 @@ export function registerAlertRoutes(router: Router, deps: AppDeps): void {
       sendError(ctx.res, 400, 'alert id must be a positive integer');
       return;
     }
-    const resolved = deps.repo.resolveAlertById(id, nowIso(deps));
+    const resolved = await deps.repo.resolveAlertById(id, nowIso(deps));
     if (!resolved) {
       sendError(ctx.res, 404, `no active alert with id ${id}`);
       return;

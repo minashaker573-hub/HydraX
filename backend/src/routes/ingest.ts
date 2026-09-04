@@ -54,8 +54,8 @@ export function registerIngestRoutes(router: Router, deps: AppDeps): void {
     }
 
     const receivedAt = nowIso(deps);
-    const id = deps.repo.insertTelemetry(result.value, receivedAt);
-    applyTelemetryAlerts(deps.repo, result.value, receivedAt);
+    const id = await deps.repo.insertTelemetry(result.value, receivedAt);
+    await applyTelemetryAlerts(deps.repo, result.value, receivedAt);
 
     log.debug(
       'ingest',
@@ -83,8 +83,8 @@ export function registerIngestRoutes(router: Router, deps: AppDeps): void {
     }
 
     const receivedAt = nowIso(deps);
-    const id = deps.repo.insertEvent(result.value, receivedAt);
-    applyEventAlerts(deps.repo, result.value, receivedAt);
+    const id = await deps.repo.insertEvent(result.value, receivedAt);
+    await applyEventAlerts(deps.repo, result.value, receivedAt);
 
     log.info('ingest', `${result.value.deviceId} event ${result.value.type}`);
     sendJson(ctx.res, 202, { accepted: true, id, received_at: receivedAt });

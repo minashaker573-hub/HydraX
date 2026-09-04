@@ -121,11 +121,11 @@ describe('offline detection', () => {
     await post(h, '/api/v1/telemetry', telemetryPayload());
 
     // Not yet overdue.
-    assert.equal(sweepOfflineDevices(h.repo, 60_000, T0 + 30_000), 0);
+    assert.equal(await sweepOfflineDevices(h.repo, 60_000, T0 + 30_000), 0);
     assert.equal((await get(h, '/api/v1/alerts')).body.alerts.length, 0);
 
     // Overdue.
-    assert.equal(sweepOfflineDevices(h.repo, 60_000, T0 + 120_000), 1);
+    assert.equal(await sweepOfflineDevices(h.repo, 60_000, T0 + 120_000), 1);
     const alerts = await get(h, '/api/v1/alerts');
     assert.equal(alerts.body.alerts[0].type, 'DEVICE_OFFLINE');
     assert.equal(alerts.body.alerts[0].severity, 'warning');
@@ -136,9 +136,9 @@ describe('offline detection', () => {
   test('does not re-raise on every sweep', async () => {
     const h = await harness();
     await post(h, '/api/v1/telemetry', telemetryPayload());
-    sweepOfflineDevices(h.repo, 60_000, T0 + 120_000);
-    sweepOfflineDevices(h.repo, 60_000, T0 + 180_000);
-    sweepOfflineDevices(h.repo, 60_000, T0 + 240_000);
+    await sweepOfflineDevices(h.repo, 60_000, T0 + 120_000);
+    await sweepOfflineDevices(h.repo, 60_000, T0 + 180_000);
+    await sweepOfflineDevices(h.repo, 60_000, T0 + 240_000);
 
     assert.equal((await get(h, '/api/v1/alerts')).body.alerts.length, 1);
   });
@@ -146,7 +146,7 @@ describe('offline detection', () => {
   test('clears automatically when the device reports again', async () => {
     const h = await harness();
     await post(h, '/api/v1/telemetry', telemetryPayload());
-    sweepOfflineDevices(h.repo, 60_000, T0 + 120_000);
+    await sweepOfflineDevices(h.repo, 60_000, T0 + 120_000);
     assert.equal((await get(h, '/api/v1/alerts')).body.alerts.length, 1);
 
     await post(h, '/api/v1/telemetry', telemetryPayload({ uptimeMs: 200_000 }));

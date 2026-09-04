@@ -8,7 +8,8 @@
 export interface Config {
   readonly host: string;
   readonly port: number;
-  readonly dbPath: string;
+  /** Postgres connection string (Supabase's "Session pooler" URI). */
+  readonly databaseUrl: string;
   /** Shared secret devices must present in `X-Device-Key`. */
   readonly deviceKey: string | null;
   /**
@@ -59,11 +60,20 @@ function intFromEnv(env: NodeJS.ProcessEnv, name: string, fallback: number): num
 
 export function loadConfig(
   env: NodeJS.ProcessEnv = process.env,
-  defaults: { dbPath: string; dashboardDir: string; websiteDir: string; adminDir: string },
+  defaults: { dashboardDir: string; websiteDir: string; adminDir: string },
 ): Config {
   const deviceKey = env.HYDRAX_DEVICE_KEY?.trim() ?? '';
   const adminKey = env.HYDRAX_ADMIN_KEY?.trim() ?? '';
   const allowInsecure = env.HYDRAX_ALLOW_INSECURE === 'true';
+
+  const databaseUrl = env.HYDRAX_DATABASE_URL?.trim() ?? '';
+  if (databaseUrl === '') {
+    throw new ConfigError(
+      'HYDRAX_DATABASE_URL is not set. Set it to a Postgres connection string — ' +
+        "Supabase's Session pooler URI, from Project Settings -> Database -> " +
+        'Connection string. See docs/CONFIGURATION.md.',
+    );
+  }
 
   // Refuse to start with ingestion wide open unless that was an explicit,
   // deliberate choice. Silently accepting unauthenticated writes is how a
@@ -96,7 +106,7 @@ export function loadConfig(
   return {
     host: env.HYDRAX_HOST ?? '0.0.0.0',
     port: intFromEnv(env, 'HYDRAX_PORT', 8080),
-    dbPath: env.HYDRAX_DB_PATH ?? defaults.dbPath,
+    databaseUrl,
     deviceKey: deviceKey === '' ? null : deviceKey,
     adminKey: adminKey === '' ? null : adminKey,
     offlineTimeoutMs: intFromEnv(env, 'HYDRAX_OFFLINE_TIMEOUT_MS', 60_000),

@@ -24,7 +24,7 @@ soil moisture sensors (4)
         │                     ▼
         │            pump + zone valve
         ▼
-    telemetry ──► backend (SQLite) ──► dashboard
+    telemetry ──► backend (Postgres) ──► dashboard
 ```
 
 - 4 capacitive soil probes, 2 per zone
@@ -51,8 +51,8 @@ firmware/          ESP32 firmware (C++17, PlatformIO / Arduino)
   src/hal/         hardware interfaces + ESP32 and simulated implementations
   src/net/         Wi-Fi uplink (background task, never blocks control)
   test/test_core/  self-contained host test suite
-backend/           Node 24 + TypeScript, zero runtime dependencies
-  src/             HTTP API, SQLite persistence, validation, alert rules
+backend/           Node 24 + TypeScript, one runtime dependency (pg, for Postgres)
+  src/             HTTP API, Postgres persistence, validation, alert rules
   test/            HTTP and domain tests
   tools/           mock device fixture
 dashboard/         static HTML/CSS/JS monitoring UI, served at /dashboard
@@ -67,11 +67,15 @@ docs/              architecture, state machine, telemetry, hardware, testing
 
 ### 1. Backend + dashboard
 
-Requires **Node 24+** (uses built-in TypeScript execution and `node:sqlite`).
+Requires **Node 24+** (uses built-in TypeScript execution) and a Postgres
+database — [Supabase](https://supabase.com) is the easiest way to get one; see
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the exact connection
+string to use.
 
 ```bash
 cd backend
 npm install
+cp .env.example .env   # then fill in HYDRAX_DATABASE_URL
 ```
 
 Set a shared secret that the firmware will also use, then start the server:

@@ -10,14 +10,18 @@ import assert from 'node:assert/strict';
 import { ConfigError, loadConfig } from '../src/config.ts';
 
 const DEFAULTS = {
-  dbPath: ':memory:',
   dashboardDir: '/tmp/dash',
   websiteDir: '/tmp/site',
   adminDir: '/tmp/admin',
 };
 
+// loadConfig only validates that a database URL string is present — it never
+// opens a connection — so a fake one here keeps this file fast and
+// network-independent while still exercising the real validation path.
+const FAKE_DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
+
 function load(env: Record<string, string | undefined>) {
-  return loadConfig(env as NodeJS.ProcessEnv, DEFAULTS);
+  return loadConfig({ HYDRAX_DATABASE_URL: FAKE_DATABASE_URL, ...env } as NodeJS.ProcessEnv, DEFAULTS);
 }
 
 describe('secret requirements', () => {
@@ -72,6 +76,21 @@ describe('secret requirements', () => {
       () => load({ HYDRAX_DEVICE_KEY: '   ', HYDRAX_ADMIN_KEY: 'admin' }),
       ConfigError,
     );
+  });
+});
+
+describe('database configuration', () => {
+  test('refuses to start with no database url', () => {
+    assert.throws(
+      () => load({ HYDRAX_DEVICE_KEY: 'device', HYDRAX_ADMIN_KEY: 'admin', HYDRAX_DATABASE_URL: undefined }),
+      (error: unknown) =>
+        error instanceof ConfigError && /HYDRAX_DATABASE_URL is not set/.test(error.message),
+    );
+  });
+
+  test('accepts a Postgres connection string', () => {
+    const config = load({ HYDRAX_DEVICE_KEY: 'device', HYDRAX_ADMIN_KEY: 'admin' });
+    assert.equal(config.databaseUrl, FAKE_DATABASE_URL);
   });
 });
 
