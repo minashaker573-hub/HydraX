@@ -145,11 +145,9 @@ The honesty guard is verified against control phrases — `Cuts water use by
 
 ## Known limitations
 
-1. **Contact details are placeholders.** `team@hydrax.example` uses the
-   reserved `.example` TLD so it cannot resolve to a real party. Phone and
-   location read "to be added". **The project owner must replace these before
-   publishing.** They are marked with a `TODO` comment in `index.html`,
-   `privacy.html` and `terms.html`.
+1. **Contact details are real.** Email, phone and location in `index.html`,
+   `privacy.html` and `terms.html` are the project's actual contact
+   information, not placeholders.
 2. **No analytics, no cookies, no third-party requests.** Nothing to consent
    to, which is deliberate but means there is no traffic measurement. The
    sticky mobile CTA's dismiss state uses `sessionStorage`, not a cookie, and
