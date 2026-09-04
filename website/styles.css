@@ -747,3 +747,83 @@ p:last-child { margin-bottom: 0; }
 .confirm-steps li::marker { color: var(--water); font-weight: 700; }
 
 .confirm-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ===========================================================================
+   404 page
+   =========================================================================== */
+
+.error-page { padding-top: clamp(56px, 10vw, 120px); }
+.error-page .eyebrow {
+  font-size: 15px; letter-spacing: 0.2em; color: var(--dim);
+}
+.error-code { font-size: clamp(34px, 5vw, 52px); }
+
+/* ===========================================================================
+   Legal pages (privacy.html, terms.html) — plain prose on the same tokens
+   =========================================================================== */
+
+.legal { padding: clamp(40px, 6vw, 72px) 0 clamp(56px, 8vw, 90px); }
+.legal .updated {
+  font-family: var(--font-mono); font-size: 12.5px; color: var(--dim);
+  letter-spacing: 0.03em; margin-bottom: 30px;
+}
+.legal h2 { font-size: 23px; margin: 44px 0 12px; }
+.legal h2:first-of-type { margin-top: 8px; }
+.legal p, .legal li { color: var(--ink-2); font-size: 16px; line-height: 1.65; }
+.legal ul, .legal ol { margin: 0 0 16px; padding-left: 22px; }
+.legal li { margin-bottom: 6px; }
+.legal strong { color: var(--ink); }
+
+/* A fact the team must supply before publishing — visually distinct so it
+   cannot be mistaken for a real, confirmed detail. Reuses the placeholder
+   treatment already established in the contact section. */
+.legal .placeholder-value { font-size: 15px; }
+
+.legal .todo-banner {
+  margin-bottom: 36px; padding: 18px 20px;
+  border: 1px solid var(--warn); background: var(--warn-soft);
+  border-radius: var(--radius);
+}
+.legal .todo-banner p { color: var(--ink-2); font-size: 14.5px; margin: 0; }
+.legal .todo-banner p + p { margin-top: 8px; }
+.legal .todo-banner strong { color: var(--ink); }
+
+/* ===========================================================================
+   Sticky mobile CTA — small screens only, appears once the hero has scrolled
+   past, hidden again once the in-page contact form is reachable so it never
+   competes with the real CTA it is standing in for.
+   =========================================================================== */
+
+.sticky-cta {
+  display: none;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -4px 16px rgba(15, 26, 32, 0.08);
+  transform: translateY(100%);
+  transition: transform 0.22s ease;
+}
+.sticky-cta.is-visible { transform: translateY(0); }
+.sticky-cta-inner { display: flex; align-items: center; gap: 10px; max-width: var(--container); margin: 0 auto; }
+.sticky-cta-text { flex: 1; min-width: 0; font-size: 13px; color: var(--ink-2); }
+.sticky-cta-text strong { display: block; font-size: 14px; color: var(--ink); }
+.sticky-cta .btn { flex: none; }
+.sticky-cta-dismiss {
+  flex: none; width: 30px; height: 30px; display: inline-flex;
+  align-items: center; justify-content: center;
+  background: none; border: none; color: var(--dim); cursor: pointer;
+  border-radius: 999px; font-size: 18px; line-height: 1;
+}
+.sticky-cta-dismiss:hover { color: var(--ink); background: var(--paper-2); }
+
+@media (max-width: 640px) {
+  .sticky-cta { display: block; }
+  /* Leave enough clearance at the very bottom of the page that the footer's
+     own links are never hidden behind the fixed bar. */
+  body:has(.sticky-cta) { padding-bottom: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sticky-cta { transition: none; }
+}

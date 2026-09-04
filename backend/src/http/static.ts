@@ -19,6 +19,8 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
   '.ico': 'image/x-icon',
   '.png': 'image/png',
   '.woff2': 'font/woff2',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
 };
 
 /**
@@ -41,6 +43,7 @@ export async function serveStatic(
   res: ServerResponse,
   rootDir: string,
   urlPath: string,
+  status = 200,
 ): Promise<boolean> {
   const filePath = resolveStaticPath(rootDir, urlPath);
   if (filePath === null) return false;
@@ -67,7 +70,7 @@ export async function serveStatic(
   }
 
   const contentType = MIME_TYPES[extname(target).toLowerCase()] ?? 'application/octet-stream';
-  res.writeHead(200, {
+  res.writeHead(status, {
     'Content-Type': contentType,
     'Cache-Control': 'no-cache',
     'X-Content-Type-Options': 'nosniff',

@@ -32,8 +32,11 @@ the software, and the site says so explicitly.
 
 ## Structure
 
-`website/index.html` is a single page with anchored sections. There is no
-router and no build step.
+`website/index.html` is the marketing page, a single page with anchored
+sections. There is no router and no build step. A handful of small standalone
+pages sit alongside it: `request.html` (the quote flow), `privacy.html`,
+`terms.html`, and `404.html` (served by the backend for any unmatched public
+path — see `backend/src/app.ts`).
 
 | Section | Answers |
 | --- | --- |
@@ -50,16 +53,28 @@ router and no build step.
 | About | Why the architecture is shaped this way |
 | Contact | Quote request and direct contact |
 
+A small sticky CTA appears on mobile once the hero has scrolled past, and
+hides again once the real contact section is reachable — see
+`js/site.js`. It is dismissible and the dismissal is remembered only for the
+tab (`sessionStorage`, not a cookie).
+
 ---
 
 ## Files
 
 ```
 website/
-  index.html     the page
-  styles.css     design tokens and all component styles
-  check.mjs      static checks, including the honesty guard
-  js/site.js     progressive enhancement only
+  index.html      the marketing page
+  request.html    the quote request flow
+  privacy.html    privacy policy (template — see Known limitations)
+  terms.html      terms of use (template — see Known limitations)
+  404.html        served by the backend for any unmatched public path
+  robots.txt      crawl rules; no Sitemap line until a production domain exists
+  og-image.svg    social preview image (SVG — see Known limitations)
+  styles.css      design tokens and all component styles
+  check.mjs       static checks, including the honesty guard
+  js/site.js      progressive enhancement only
+  js/request.js   the quote form
 ```
 
 ---
@@ -133,10 +148,34 @@ The honesty guard is verified against control phrases — `Cuts water use by
 1. **Contact details are placeholders.** `team@hydrax.example` uses the
    reserved `.example` TLD so it cannot resolve to a real party. Phone and
    location read "to be added". **The project owner must replace these before
-   publishing.** They are marked with a `TODO` comment in `index.html`.
+   publishing.** They are marked with a `TODO` comment in `index.html`,
+   `privacy.html` and `terms.html`.
 2. **No analytics, no cookies, no third-party requests.** Nothing to consent
-   to, which is deliberate but means there is no traffic measurement.
+   to, which is deliberate but means there is no traffic measurement. The
+   sticky mobile CTA's dismiss state uses `sessionStorage`, not a cookie, and
+   carries no identifying data.
 3. **Single language (English).**
 4. **No CMS.** Copy changes are edits to `index.html`.
 5. **Hero schematic is illustrative**, not a live view of a device. The live
    view is the dashboard, one click away.
+6. **`privacy.html` and `terms.html` are templates, not published legal
+   documents.** They describe what the code actually does today, verified
+   against the backend, but leave the legal entity, address, jurisdiction,
+   liability clause and retention period as marked placeholders. **They need
+   the project owner's review — and ideally counsel's — before they are
+   linked from a live, public deployment.**
+7. **No production domain is defined anywhere in this repository.** Because
+   of that: `robots.txt` has no `Sitemap:` line, no `sitemap.xml` exists, and
+   `og:url`/absolute `og:image` are not set — all documented inline where
+   they're missing, rather than invented. Once a domain is chosen, see the
+   `TODO` comments in `index.html`'s `<head>` and in `robots.txt`.
+8. **`og-image.svg` is an SVG, not the PNG most social platforms expect.**
+   It renders correctly when opened directly and is wired up via `og:image`
+   and `twitter:image`, but Facebook/LinkedIn/iMessage previews are
+   unreliable with SVG. Convert it to a 1200×630 PNG before relying on link
+   previews for launch.
+9. **No analytics is installed.** If one is added later, it must run under
+   the existing CSP (`connect-src 'self'` — no external endpoint can be
+   reached without changing it), must not set non-essential cookies without a
+   consent mechanism, and should be configured from an environment variable
+   rather than a hardcoded ID.

@@ -86,6 +86,11 @@ export function createApp(deps: AppDeps): RequestListener {
             if (await serveStatic(res, deps.config.adminDir, rest)) return;
           } else {
             if (await serveStatic(res, deps.config.websiteDir, url.pathname)) return;
+            // A genuine miss on the public site gets the branded 404 page, not
+            // a bare JSON error — a visitor following a stale or mistyped link
+            // should land somewhere that still looks like HYDRAX and offers a
+            // way back in. /api/* and the dashboard/admin mounts are untouched.
+            if (await serveStatic(res, deps.config.websiteDir, '/404.html', 404)) return;
           }
         }
 

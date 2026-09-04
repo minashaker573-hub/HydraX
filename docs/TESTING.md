@@ -93,7 +93,7 @@ leaves an empty string rather than a half-written payload.
 
 ## Backend tests
 
-65 tests. Runs a real HTTP server on a real socket with an in-memory database.
+117 tests. Runs a real HTTP server on a real socket with an in-memory database.
 
 ```bash
 cd backend

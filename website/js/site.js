@@ -99,3 +99,69 @@ if (sections.length > 0 && 'IntersectionObserver' in window) {
 
   for (const section of sections) observer.observe(section);
 }
+
+/* --------------------------------------------------------- sticky mobile CTA -- */
+
+// Small screens only (the CSS hides the bar entirely above 640px, so this is
+// just avoiding pointless observer work on desktop). Appears once the hero has
+// scrolled past, disappears again once the real contact form is reachable —
+// it exists to stand in for a CTA that has scrolled out of view, not to
+// duplicate one that's already on screen. Dismissible, and the dismissal is
+// remembered only for this tab: a UI preference, not tracking.
+const stickyCta = document.getElementById('sticky-cta');
+const stickyDismiss = document.getElementById('sticky-cta-dismiss');
+const hero = document.getElementById('top');
+const contactSection = document.getElementById('contact');
+
+if (stickyCta instanceof HTMLElement && hero instanceof HTMLElement && 'IntersectionObserver' in window) {
+  const DISMISS_KEY = 'hydrax-sticky-cta-dismissed';
+  let dismissed = false;
+  try {
+    dismissed = sessionStorage.getItem(DISMISS_KEY) === '1';
+  } catch {
+    // Storage can throw in a private tab or with site data blocked; treat
+    // that as "not dismissed" rather than breaking the page over it.
+    dismissed = false;
+  }
+
+  let pastHero = false;
+  let overContact = false;
+
+  const sync = () => {
+    stickyCta.hidden = dismissed || !pastHero || overContact;
+    stickyCta.classList.toggle('is-visible', !stickyCta.hidden);
+  };
+
+  const heroObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) pastHero = !entry.isIntersecting;
+      sync();
+    },
+    { threshold: 0 },
+  );
+  heroObserver.observe(hero);
+
+  if (contactSection instanceof HTMLElement) {
+    const contactObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) overContact = entry.isIntersecting;
+        sync();
+      },
+      { threshold: 0, rootMargin: '0px 0px -20% 0px' },
+    );
+    contactObserver.observe(contactSection);
+  }
+
+  if (stickyDismiss instanceof HTMLElement) {
+    stickyDismiss.addEventListener('click', () => {
+      dismissed = true;
+      sync();
+      try {
+        sessionStorage.setItem(DISMISS_KEY, '1');
+      } catch {
+        // Nothing to remember across renders; the bar just stays dismissed
+        // for the rest of this page view instead of this whole tab.
+      }
+    });
+  }
+}

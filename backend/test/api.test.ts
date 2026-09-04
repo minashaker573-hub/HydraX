@@ -303,6 +303,21 @@ describe('routing', () => {
     const response = await fetch(`${h.baseUrl}/..%2f..%2fbackend%2fpackage.json`);
     assert.equal(response.status, 404);
   });
+
+  test('serves the branded 404 page for an unknown public path', async () => {
+    const h = await harness();
+    const response = await fetch(`${h.baseUrl}/this-page-does-not-exist`);
+    assert.equal(response.status, 404);
+    assert.ok((response.headers.get('content-type') ?? '').startsWith('text/html'));
+    assert.match(await response.text(), /HYDRAX/);
+  });
+
+  test('an unknown API path still 404s as JSON, not the HTML page', async () => {
+    const h = await harness();
+    const response = await get(h, '/api/v1/definitely-not-a-route');
+    assert.equal(response.status, 404);
+    assert.equal(typeof response.body.error, 'string');
+  });
 });
 
 describe('dashboard aggregate', () => {

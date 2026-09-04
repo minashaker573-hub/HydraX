@@ -58,11 +58,17 @@ for (const page of pages) {
 
   console.log(`\n${page} — assets:`);
   const refs = [...html.matchAll(/(?:src|href)="(\/[^"]*)"/g)].map((m) => m[1]);
+  // Routes handled by the backend or resolved by the server's extensionless
+  // fallback, not files that exist verbatim on disk.
+  const KNOWN_ROUTES = new Set(['/dashboard', '/request', '/privacy', '/terms']);
   let checked = 0;
   for (const ref of new Set(refs)) {
-    // Routes handled by the backend, not files on disk.
-    if (ref.startsWith('/api/') || ref === '/dashboard' || ref === '/request') continue;
-    const onDisk = join(HERE, ref.replace(/^\//, ''));
+    if (ref.startsWith('/api/')) continue;
+    // A same-origin link to a page section, e.g. /#contact from another page.
+    // The path before '#' is what has to exist; a bare '/' is the homepage.
+    const [path] = ref.split('#');
+    if (path === '' || path === '/' || KNOWN_ROUTES.has(path)) continue;
+    const onDisk = join(HERE, path.replace(/^\//, ''));
     checked += 1;
     if (!existsSync(onDisk)) fail(`${page} references missing asset ${ref}`);
   }
@@ -232,6 +238,24 @@ console.log('\ncommercial language:');
     }
   }
   if (clean) ok('no purchase language and no prices');
+}
+
+/* --- 9. technical files ----------------------------------------------------- */
+console.log('\ntechnical files:');
+{
+  if (existsSync(join(HERE, '404.html'))) ok('404.html exists');
+  else fail('404.html is missing — a routing miss on the public site falls back to a bare error');
+
+  const robotsPath = join(HERE, 'robots.txt');
+  if (!existsSync(robotsPath)) {
+    fail('robots.txt is missing');
+  } else {
+    const robots = await readFile(robotsPath, 'utf8');
+    if (/^User-agent:/im.test(robots)) ok('robots.txt has a User-agent rule');
+    else fail('robots.txt has no User-agent rule');
+    if (/Disallow:\s*\/admin/i.test(robots)) ok('robots.txt keeps /admin out of the crawl');
+    else fail('robots.txt does not exclude /admin from crawling');
+  }
 }
 
 console.log('');

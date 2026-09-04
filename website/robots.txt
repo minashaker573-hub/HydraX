@@ -1,0 +1,13 @@
+# HYDRAX — crawling rules for the public website.
+# The operator console additionally sets its own <meta name="robots" noindex>.
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+# No production domain is defined anywhere in this repository yet, so no
+# absolute sitemap URL can be given here without inventing one. Once a
+# production domain is chosen, generate sitemap.xml (see docs/WEBSITE.md)
+# and uncomment the line below, pointed at that domain:
+# Sitemap: https://REPLACE-WITH-PRODUCTION-DOMAIN/sitemap.xml
