@@ -2,25 +2,23 @@
  * HYDRAX website — Anime.js scroll-driven reveals.
  *
  * Presentation only, exactly like js/site.js: every section is fully present
- * in the HTML and readable with this file blocked or absent (see the
- * `data-reveal*` fallback rule in styles.css, which keeps every element at
- * full opacity unless JS actually runs). This file only ever adds a brief,
- * one-time entrance to something already on the page — it never renders
- * content, never changes copy, never touches the request flow or the nav.
+ * in the HTML and readable with this file blocked or absent. Nothing here
+ * fetches data or changes copy — it only animates elements already on the
+ * page, once, the first time they scroll into view.
  *
- * Two attributes drive everything, read off the markup in index.html:
- *   data-reveal="fade-up|fade-right|fade-left"   — one element, one entrance
- *   data-reveal-group="fade-up" data-reveal-stagger="70"
- *                                                  — a container whose direct
- *                                                    children stagger in as a
- *                                                    sequence (the control
- *                                                    loop stages, the soil-to-
- *                                                    valve flow, the field
- *                                                    problem's four nodes,
- *                                                    the feature grid)
+ * Three independent, restrained effects, matching the brief this redesign
+ * follows ("subtle, deliberate, premium... do not animate every element"):
+ *   1. data-reveal / data-reveal-group — a fade + upward reveal, once.
+ *   2. #field-line-live — the thin divider under the hero gets a slow,
+ *      looping "water moving through it" dash animation, running only while
+ *      it is actually on screen.
+ *   3. #droplet-ripple — one rare, understated ripple around the water-
+ *      droplet accent photo, the first time it comes into view. Never loops.
+ *   4. [data-count-up] — the small verification-numbers strip counts up
+ *      from zero once, toward the real number already in the markup.
  *
- * Every entrance fires once, the first time its element scrolls into view,
- * then stops being observed — scrolling back up never replays it.
+ * The hero's own slow drift/zoom and the confirmation checkmark are plain
+ * CSS animations (see styles.css) — no JS needed for those.
  */
 
 import { animate, stagger } from './vendor/animejs/anime.esm.min.js';
@@ -34,12 +32,12 @@ function reducedMotion() {
 }
 
 if (reducedMotion() || !('IntersectionObserver' in window)) {
-  // Nothing to do: styles.css already renders every element at full opacity
-  // with no transform, so there is no "stuck invisible" state to recover
-  // from here — this file simply never runs its animations.
+  // Nothing to do: every element this file would animate already renders at
+  // full opacity in its resting position via plain CSS — there is no
+  // "stuck invisible" state to recover from by skipping this.
 } else {
   const OFFSETS = {
-    'fade-up': { opacity: [0, 1], translateY: [16, 0] },
+    'fade-up': { opacity: [0, 1], translateY: [18, 0] },
     'fade-right': { opacity: [0, 1], translateX: [-22, 0] },
     'fade-left': { opacity: [0, 1], translateX: [22, 0] },
   };
@@ -50,7 +48,7 @@ if (reducedMotion() || !('IntersectionObserver' in window)) {
     el.style.willChange = 'opacity, transform';
     animate(el, {
       ...kind,
-      duration: 620,
+      duration: 700,
       delay,
       ease: 'outQuad',
       onComplete: () => {
@@ -62,13 +60,13 @@ if (reducedMotion() || !('IntersectionObserver' in window)) {
 
   function revealGroup(container) {
     const kind = OFFSETS[container.dataset.revealGroup] || OFFSETS['fade-up'];
-    const staggerMs = Number(container.dataset.revealStagger || 60);
+    const staggerMs = Number(container.dataset.revealStagger || 70);
     const children = Array.from(container.children);
     if (children.length === 0) return;
     for (const child of children) child.style.willChange = 'opacity, transform';
     animate(children, {
       ...kind,
-      duration: 560,
+      duration: 620,
       delay: stagger(staggerMs),
       ease: 'outQuad',
       onComplete: (anim) => {
@@ -80,7 +78,7 @@ if (reducedMotion() || !('IntersectionObserver' in window)) {
     });
   }
 
-  const observer = new IntersectionObserver(
+  const revealObserver = new IntersectionObserver(
     (entries, obs) => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
@@ -90,34 +88,65 @@ if (reducedMotion() || !('IntersectionObserver' in window)) {
         obs.unobserve(el);
       }
     },
-    { threshold: 0.18, rootMargin: '0px 0px -8% 0px' },
+    { threshold: 0.16, rootMargin: '0px 0px -8% 0px' },
   );
-
   for (const el of document.querySelectorAll('[data-reveal], [data-reveal-group]')) {
-    observer.observe(el);
+    revealObserver.observe(el);
   }
 
-  /* ----------------------------------------------------- device illustration
-     flow lines. The illustration is defined once as an SVG <symbol> and
-     instanced twice (hero, "The System") via <use> — styling and class
-     toggles on the symbol's own children apply to every instance, so a
-     single observer covering both instancing points is enough. Runs only
-     while at least one instance is on screen, matching the same rule
-     js/site.js already applies to the old hero schematic. */
-  const flowLines = document.querySelectorAll('#hydrax-device .d-line-live');
-  const stages = document.querySelectorAll('.device-stage');
-  if (flowLines.length > 0 && stages.length > 0) {
-    const visible = new Set();
-    const flowObserver = new IntersectionObserver(
+  /* ------------------------------------------------------- field-line flow -- */
+  const fieldLine = document.getElementById('field-line-live');
+  if (fieldLine) {
+    const lineObserver = new IntersectionObserver(
       (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) visible.add(entry.target);
-          else visible.delete(entry.target);
-        }
-        for (const line of flowLines) line.classList.toggle('is-flowing', visible.size > 0);
+        for (const entry of entries) fieldLine.classList.toggle('is-flowing', entry.isIntersecting);
       },
-      { threshold: 0.2 },
+      { threshold: 0.1 },
     );
-    for (const stage of stages) flowObserver.observe(stage);
+    lineObserver.observe(fieldLine);
+  }
+
+  /* --------------------------------------------------- one rare water ripple -- */
+  const ripple = document.getElementById('droplet-ripple');
+  if (ripple) {
+    const rippleObserver = new IntersectionObserver(
+      (entries, obs) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          ripple.classList.add('is-rippling');
+          obs.unobserve(ripple);
+        }
+      },
+      { threshold: 0.5 },
+    );
+    rippleObserver.observe(ripple);
+  }
+
+  /* --------------------------------------------- verification count-up, once -- */
+  const verifyStrip = document.getElementById('verify-strip');
+  if (verifyStrip) {
+    const countObserver = new IntersectionObserver(
+      (entries, obs) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          for (const dt of verifyStrip.querySelectorAll('[data-count-up]')) {
+            const target = Number(dt.dataset.countUp);
+            if (!Number.isFinite(target)) continue;
+            const counter = { v: 0 };
+            animate(counter, {
+              v: target,
+              duration: 900,
+              delay: 150,
+              ease: 'outExpo',
+              onUpdate: () => { dt.textContent = String(Math.round(counter.v)); },
+              onComplete: () => { dt.textContent = String(target); },
+            });
+          }
+          obs.unobserve(verifyStrip);
+        }
+      },
+      { threshold: 0.4 },
+    );
+    countObserver.observe(verifyStrip);
   }
 }

@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>HYDRAX — Irrigation that decides at the edge</title>
+    <title>HYDRAX — Water that lets every field thrive</title>
     <meta
       name="description"
       content="HYDRAX SmartFarm Guardian measures soil moisture per zone and decides when to irrigate on the controller itself — so watering keeps working when the network does not."
     />
-    <meta name="color-scheme" content="dark light" />
+    <meta name="color-scheme" content="light" />
 
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="HYDRAX — Irrigation that decides at the edge" />
+    <meta property="og:title" content="HYDRAX — Water that lets every field thrive" />
     <meta
       property="og:description"
       content="Soil-based irrigation control that runs on the farm, not in the cloud."
@@ -24,11 +24,11 @@
       anywhere in this repository yet — so none is set here. Once one exists:
         1. add <meta property="og:url" content="https://YOUR-DOMAIN/" />
         2. point og:image at an absolute URL on that domain
-        3. convert og-image.svg to a 1200x630 PNG/JPG — SVG has inconsistent
-           support across Facebook, LinkedIn and iMessage link previews.
+        3. consider a PNG/JPG export of assets/logo.jpeg at 1200x630 — social
+           platforms render SVG previews inconsistently.
     -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="HYDRAX — Irrigation that decides at the edge" />
+    <meta name="twitter:title" content="HYDRAX — Water that lets every field thrive" />
     <meta
       name="twitter:description"
       content="Soil-based irrigation control that runs on the farm, not in the cloud."
@@ -37,115 +37,30 @@
     <link rel="canonical" href="/" />
 
     <link rel="stylesheet" href="/styles.css" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230f6fd1'/><path d='M50 18 C50 18 74 46 74 62 a24 24 0 0 1-48 0 C26 46 50 18 50 18Z' fill='white'/></svg>"
-    />
+    <link rel="icon" href="/assets/logo.jpeg" />
   </head>
 
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
 
-    <!-- Reusable device illustration, defined once and instanced with <use>
-         in both the hero and "The System" — a technical diagram of the
-         verified architecture (config/hydrax_config.h's actual pin/zone
-         layout), not a product photograph: none exists yet, and inventing
-         one is explicitly out of scope. See docs/HARDWARE_VALIDATION.md. -->
-    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
-      <symbol id="hydrax-device" viewBox="0 0 560 440">
-        <!-- soil band -->
-        <rect x="0" y="392" width="560" height="48" fill="var(--surface-2)" />
-        <line x1="0" y1="392" x2="560" y2="392" stroke="var(--line)" stroke-width="1" />
-        <text x="14" y="420" class="d-tag">SOIL</text>
-
-        <!-- controller -->
-        <rect class="d-unit d-unit-strong" x="36" y="150" width="128" height="92" rx="12" />
-        <rect x="36" y="150" width="128" height="6" rx="3" fill="var(--water)" opacity="0.6" />
-        <text x="100" y="188" text-anchor="middle" class="d-label" font-size="15">ESP32</text>
-        <text x="100" y="207" text-anchor="middle" class="d-sub" font-size="11">controller unit</text>
-        <text x="100" y="224" text-anchor="middle" class="d-tag d-tag-accent" font-size="9">DECIDES HERE</text>
-
-
-        <!-- pump line -->
-        <path class="d-line d-line-live" d="M100 242 V300 H186" />
-        <circle class="d-node" cx="186" cy="300" r="5" />
-        <text x="140" y="294" class="d-tag" font-size="9">PUMP LINE</text>
-
-        <!-- branch to valve 1 (zone 1, active) -->
-        <path class="d-line d-line-live" d="M186 300 V220 H244" />
-        <circle class="d-node" cx="244" cy="220" r="9" />
-        <text x="244" y="202" text-anchor="middle" class="d-tag d-tag-accent" font-size="9">VALVE 1</text>
-
-        <!-- branch to valve 2 (zone 2, idle) -->
-        <path class="d-line d-line-dashed" d="M186 300 V352 H244" stroke="var(--line-strong)" />
-        <circle class="d-node d-node-idle" cx="244" cy="352" r="9" stroke="var(--line-strong)" stroke-width="2" fill="var(--surface)" />
-        <text x="244" y="372" text-anchor="middle" class="d-tag" font-size="9">VALVE 2</text>
-
-        <!-- zone 1 plot -->
-        <rect class="d-unit d-unit-strong" x="270" y="176" width="220" height="88" rx="10" />
-        <text x="286" y="200" class="d-label" font-size="12">ZONE 1</text>
-        <text x="474" y="200" text-anchor="end" class="d-tag d-tag-accent" font-size="9">IRRIGATING</text>
-        <line class="d-probe-stem" x1="310" y1="212" x2="310" y2="392" stroke="var(--growth)" stroke-width="1.4" opacity="0.55" />
-        <line class="d-probe-stem" x1="346" y1="212" x2="346" y2="392" stroke="var(--growth)" stroke-width="1.4" opacity="0.55" />
-        <circle class="d-probe" cx="310" cy="236" r="4.5" />
-        <circle class="d-probe" cx="346" cy="236" r="4.5" />
-        <text x="286" y="252" class="d-sub" font-size="10">2 probes · both healthy</text>
-
-        <!-- zone 2 plot -->
-        <rect class="d-unit" x="270" y="308" width="220" height="88" rx="10" />
-        <text x="286" y="332" class="d-label" font-size="12">ZONE 2</text>
-        <text x="474" y="332" text-anchor="end" class="d-tag" font-size="9">IDLE</text>
-        <line x1="310" y1="344" x2="310" y2="392" stroke="var(--line-strong)" stroke-width="1.4" opacity="0.5" />
-        <line x1="346" y1="344" x2="346" y2="392" stroke="var(--line-strong)" stroke-width="1.4" opacity="0.5" />
-        <circle class="d-probe" cx="310" cy="368" r="4.5" />
-        <circle class="d-probe" cx="346" cy="368" r="4.5" />
-        <text x="286" y="384" class="d-sub" font-size="10">above threshold</text>
-
-        <!-- dashboard, dashed and off to the side: optional by design -->
-        <path class="d-leader" d="M100 150 V70" stroke-dasharray="3 5" />
-        <rect class="d-callout" x="46" y="30" width="108" height="42" rx="10" stroke-dasharray="4 4" />
-        <text x="100" y="50" text-anchor="middle" class="d-sub" font-size="11">dashboard</text>
-        <text x="100" y="64" text-anchor="middle" class="d-tag" font-size="8">MONITORING · OPTIONAL</text>
-      </symbol>
-
-      <!-- Small line-art icon set shared by the architecture chain and the
-           soil-to-valve flow — same drawing language as the dashboard's own
-           icon set (dashboard/js/ui.js), reused rather than invented fresh. -->
-      <symbol id="icon-sensor" viewBox="0 0 24 24"><path d="M12 3s6 6.5 6 10.5a6 6 0 0 1-12 0C6 9.5 12 3 12 3Z" /></symbol>
-      <symbol id="icon-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" /></symbol>
-      <symbol id="icon-valve" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M5 12H1M23 12h-4M8 8l-2-2M18 8l2-2M8 16l-2 2M18 16l2 2M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z" /></symbol>
-      <symbol id="icon-flow" viewBox="0 0 24 24"><path d="M3 12h4l2-7 4 14 2-7h6" /></symbol>
-      <symbol id="icon-dashboard" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></symbol>
-      <symbol id="icon-branch" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5" /><circle cx="6" cy="18" r="2.5" /><circle cx="18" cy="12" r="2.5" /><path d="M6 8.5v7M8 6h2a4 4 0 0 1 4 4M8 18h2a4 4 0 0 0 4-4" /></symbol>
-      <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></symbol>
-    </svg>
-
     <!-- ==================================================== nav -->
     <header class="nav" id="nav">
       <div class="nav-inner">
         <a class="brand" href="#top" aria-label="HYDRAX home">
-          <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true">
-            <path d="M50 14 C50 14 76 44 76 62 a26 26 0 0 1-52 0 C24 44 50 14 50 14Z" />
-          </svg>
-          <span class="brand-text">
-            <span class="brand-name">HYDRAX</span>
-            <span class="brand-sub">SmartFarm Guardian</span>
-          </span>
+          <img class="brand-mark-img" src="/assets/logo.jpeg" alt="" aria-hidden="true" />
         </a>
 
         <nav class="nav-links" id="nav-links" aria-label="Sections">
           <a href="#problem">Problem</a>
           <a href="#how">How it works</a>
-          <a href="#built">Features</a>
-          <a href="#system">Technology</a>
           <a href="#product">Product</a>
-          <a href="#status">Status</a>
+          <a href="#benefits">Benefits</a>
           <a href="#contact">Contact</a>
         </nav>
 
         <div class="nav-actions">
           <a class="btn btn-ghost" href="/dashboard">Live dashboard</a>
-          <a class="btn btn-primary" href="/request">Request a quote</a>
+          <a class="btn btn-primary" href="/request">Request a System</a>
         </div>
 
         <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links">
@@ -159,20 +74,16 @@
       <!-- ================================================== 1. hero -->
       <section class="hero" id="top">
         <div class="container hero-grid">
-          <div class="hero-copy" data-reveal="fade-right">
+          <div class="hero-copy" data-reveal="fade-up">
             <p class="eyebrow">Intelligent irrigation &amp; monitoring</p>
-            <h1>Water decisions,<br /><span class="accent">made in the field.</span></h1>
+            <h1>Water that lets every field thrive.</h1>
             <p class="lede">
-              HYDRAX measures soil moisture by zone and decides whether to irrigate on the
-              controller itself. That decision does not travel to a server and back — the
-              network is for watching the farm, never for running it.
+              HYDRAX reads soil moisture zone by zone and lets the controller in the field decide
+              when to irrigate — on the spot, without waiting on a server that might not answer.
             </p>
-
             <div class="hero-actions">
               <a class="btn btn-primary btn-lg" href="/request">Request a HYDRAX System</a>
-              <a class="btn btn-outline btn-lg" href="#system">Explore the System</a>
             </div>
-
             <ul class="hero-points">
               <li>Keeps irrigating with the internet down</li>
               <li>Per-zone soil thresholds, not a clock</li>
@@ -180,504 +91,267 @@
             </ul>
           </div>
 
-          <div class="device-stage" data-reveal="fade-up" data-reveal-delay="120">
-            <div class="device-glow" aria-hidden="true"></div>
-            <svg class="device-illustration" viewBox="0 0 560 440" role="img" aria-label="HYDRAX controller wired to two irrigation zones, with the dashboard shown separately and connected by a dashed, optional line">
-              <use href="#hydrax-device" />
-            </svg>
+          <div class="hero-photo" data-reveal="fade-up" data-reveal-delay="120">
+            <img
+              src="/assets/hero-field-canal.jpg"
+              alt="Aerial view of cultivated fields divided by an irrigation canal"
+              width="2400" height="1801"
+            />
           </div>
         </div>
-        <div class="container">
-          <p class="device-caption">
-            <strong>This is the architecture, drawn to scale of importance, not a stock photo.</strong>
-            The prototype has not yet run on physical hardware — see
-            <a href="#status">Engineering status</a> for exactly what that means today.
-          </p>
-        </div>
       </section>
+
+      <svg class="field-line" viewBox="0 0 1180 28" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 20 C 300 4, 700 32, 1180 10" />
+        <path class="is-live" id="field-line-live" d="M0 20 C 300 4, 700 32, 1180 10" />
+      </svg>
 
       <!-- ================================================== 2. the field problem -->
       <section class="section" id="problem">
-        <div class="container">
-          <p class="section-label">The field problem</p>
-          <div class="problem-statement">
-            <h2>Most irrigation systems know <em>when</em> to run.<br />They don't know <em>why</em>.</h2>
-            <p class="section-lede">
-              A timer cannot see rainfall, a heatwave, a blocked line or a probe that has failed.
-              And on most farms, the four things that would explain what is actually happening
-              never end up in the same place.
+        <div class="container problem-grid">
+          <div class="problem-copy" data-reveal="fade-up">
+            <p class="section-label">The field problem</p>
+            <p class="pull">Most irrigation systems know when to run. They don't know why.</p>
+            <p>
+              A fixed schedule cannot see rainfall, a heatwave, a blocked line or a probe that has
+              failed — it applies the same water on the same day regardless of what the ground
+              actually needs. Walking zones to judge moisture by hand is slow and inconsistent
+              between people. And a valve stuck open, or a pump left running, can waste water for
+              hours before anyone notices — usually by seeing the result, not the cause.
+            </p>
+            <p>
+              Many connected controllers make this worse: they send a reading up and wait for an
+              instruction back. On a farm with intermittent connectivity, that means the thing
+              deciding whether crops get water is somewhere else entirely.
             </p>
           </div>
-
-          <div class="disconnect" data-reveal-group="fade-up" data-reveal-stagger="70">
-            <div class="disconnect-node">
-              <p class="disconnect-node-index">01</p>
-              <h3>Soil</h3>
-              <p>Moisture changes zone by zone, hour by hour. Rarely measured, almost never logged.</p>
-            </div>
-            <div class="disconnect-node">
-              <p class="disconnect-node-index">02</p>
-              <h3>Pump</h3>
-              <p>Runs on a schedule or a switch someone flips, with no view of what the soil needed.</p>
-            </div>
-            <div class="disconnect-node">
-              <p class="disconnect-node-index">03</p>
-              <h3>Water</h3>
-              <p>Flows or doesn't, but a stuck valve or a burst line often goes unnoticed for hours.</p>
-            </div>
-            <div class="disconnect-node">
-              <p class="disconnect-node-index">04</p>
-              <h3>People</h3>
-              <p>Find out last — usually by seeing the result in the field, not the cause behind it.</p>
-            </div>
+          <div class="problem-photo" data-reveal="fade-up" data-reveal-delay="100">
+            <img
+              src="/assets/field-problem-aerial.jpg"
+              alt="Aerial view of narrow cultivated plots separated by water channels"
+              width="2000" height="1501"
+            />
           </div>
-
-          <p class="problem-note">
-            <strong>HYDRAX exists to close that loop on the controller itself</strong> — soil
-            reading in, irrigation decision out, on the same device, without waiting on a
-            network round trip to a backend that might not even be reachable.
-          </p>
         </div>
       </section>
 
-      <!-- ================================================== 3. how hydrax thinks -->
+      <!-- ================================================== 3. how hydrax works -->
       <section class="section section-alt" id="how">
-        <div class="container">
-          <p class="section-label">How HYDRAX thinks</p>
-          <h2>One control loop, running entirely on the controller.</h2>
-          <p class="section-lede">
-            Every stage below executes on the ESP32, once a second. The backend and dashboard
-            observe this loop; they are never a step inside it.
-          </p>
-
-          <div class="think-flow" id="think-flow" data-reveal-group="fade-up" data-reveal-stagger="90">
-            <div class="think-stage" data-stage="1">
-              <span class="think-stage-num">01</span>
-              <h3>Sense</h3>
-              <p>Two capacitive probes per zone, median-filtered against spikes and checked against a plausible electrical range before anything trusts the number.</p>
-            </div>
-            <div class="think-stage" data-stage="2">
-              <span class="think-stage-num">02</span>
-              <h3>Understand</h3>
-              <p>A zone's moisture is the mean of the probes that are actually working. A failed probe is excluded, never averaged in as zero.</p>
-            </div>
-            <div class="think-stage" data-stage="3">
-              <span class="think-stage-num">03</span>
-              <h3>Decide</h3>
-              <p>Starts below a start threshold, stops at a higher stop threshold. The gap between them is deliberate — a single setpoint would chatter the pump.</p>
-            </div>
-            <div class="think-stage" data-stage="4">
-              <span class="think-stage-num">04</span>
-              <h3>Act</h3>
-              <p>The zone valve opens first, the pump follows — never the reverse. One zone at a time. A maximum runtime bounds the worst case.</p>
-            </div>
-            <div class="think-stage" data-stage="5">
-              <span class="think-stage-num">05</span>
-              <h3>Monitor</h3>
-              <p>Readings and events publish to the dashboard. Offline, they buffer on the device and flush on reconnect — irrigation does not wait for either.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ================================================== 4. the system -->
-      <section class="section" id="system">
-        <div class="container system-grid">
-          <div data-reveal="fade-right">
-            <p class="section-label">The system</p>
-            <h2>Four links, in one direction.</h2>
+        <div class="container works-grid">
+          <div>
+            <p class="section-label">How HYDRAX works</p>
+            <h2>Soil signals, a local decision, water where it's needed.</h2>
             <p class="section-lede" style="margin-bottom: 0;">
-              Zone count, pins and thresholds are configuration, not code — the current build
-              covers two zones, and the architecture is not limited to that number.
+              Every step below runs on the controller itself. The backend and dashboard only
+              observe it — see <a href="#product">the platform</a> for what that looks like.
             </p>
 
-            <ol class="arch-chain">
-              <li class="arch-step">
-                <span class="arch-step-icon"><svg><use href="#icon-sensor" /></svg></span>
+            <ol class="works-flow" data-reveal-group="fade-up" data-reveal-stagger="90">
+              <li class="works-step">
+                <span class="works-step-num">1</span>
                 <div>
-                  <h3>Soil sensors</h3>
-                  <p>Four capacitive probes, two per zone, sampled and filtered on the device.</p>
+                  <h3>Soil signals</h3>
+                  <p>
+                    Two capacitive probes per zone read moisture continuously. Each reading is
+                    filtered against spikes and checked for a plausible electrical range before
+                    anything trusts it.
+                  </p>
+                  <p class="works-step-detail">median-filtered · range-checked · per probe</p>
                 </div>
               </li>
-              <li class="arch-step">
-                <span class="arch-step-icon"><svg><use href="#icon-cpu" /></svg></span>
+              <li class="works-step">
+                <span class="works-step-num">2</span>
                 <div>
-                  <h3>ESP32 controller</h3>
-                  <p>Runs the irrigation state machine and holds every safety interlock.</p>
+                  <h3>A local decision</h3>
+                  <p>
+                    The controller compares each zone's reading against its own start and stop
+                    thresholds and decides — on the device, without waiting on a network round
+                    trip to answer.
+                  </p>
+                  <p class="works-step-detail">hysteresis band · minimum runtime · cooldown</p>
                 </div>
               </li>
-              <li class="arch-step">
-                <span class="arch-step-icon"><svg><use href="#icon-valve" /></svg></span>
+              <li class="works-step">
+                <span class="works-step-num">3</span>
                 <div>
-                  <h3>Zone valves</h3>
-                  <p>One open at a time, driven through a relay stage the controller never bypasses.</p>
-                </div>
-              </li>
-              <li class="arch-step">
-                <span class="arch-step-icon"><svg><use href="#icon-flow" /></svg></span>
-                <div>
-                  <h3>Irrigation</h3>
-                  <p>Water reaches exactly the zone the controller opened a valve for — nowhere else.</p>
+                  <h3>Healthier crops</h3>
+                  <p>
+                    Water reaches a zone because its own soil called for it — not because a
+                    calendar said so. That's the aim the whole loop above is built around.
+                  </p>
                 </div>
               </li>
             </ol>
+          </div>
 
-            <div class="arch-branch">
-              <span class="arch-branch-tag">SIDE BRANCH</span>
+          <div class="works-accent">
+            <div class="droplet-accent" data-reveal="fade-up" data-reveal-delay="150">
+              <div class="droplet-accent-photo">
+                <img
+                  src="/assets/water-droplet-leaf.jpg"
+                  alt="Close-up of water droplets on a leaf edge"
+                  width="1600" height="1200"
+                />
+              </div>
+              <span class="droplet-ripple" id="droplet-ripple" aria-hidden="true"></span>
+              <p class="droplet-accent-caption">The same decision, made the same way, every time a zone reads dry.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================== 4. product / platform -->
+      <section class="section" id="product">
+        <div class="container">
+          <p class="section-label">The platform</p>
+          <h2>See what the field sees.</h2>
+          <p class="section-lede">
+            This is an actual capture of the dashboard shipped with the system, running against
+            the simulation fixture on this server — labelled as such, in the interface itself,
+            not cropped out for this page.
+          </p>
+
+          <div class="platform-frame" data-reveal="fade-up">
+            <img
+              src="/dashboard-preview.png"
+              width="1600" height="1000"
+              alt="HYDRAX dashboard overview showing system status, soil moisture, the live control loop, and active alerts, with a DEMO / SIMULATION badge because this capture runs on the mock-device fixture"
+              loading="lazy"
+            />
+          </div>
+          <p class="platform-caption">
+            <span><strong>Overview page</strong> — system status, soil moisture, control loop, alerts</span>
+            <span>Live at <a href="/dashboard">/dashboard</a></span>
+          </p>
+
+          <ul class="platform-list">
+            <li><strong>System status</strong>Device connectivity and last contact</li>
+            <li><strong>Soil moisture</strong>Per zone, and the farm average</li>
+            <li><strong>Irrigation state</strong>Idle, starting, irrigating, stopped, faulted</li>
+            <li><strong>Zones &amp; valves</strong>Per-zone valve state and sensor coverage</li>
+            <li><strong>Alerts &amp; events</strong>A filterable timeline, not a static log</li>
+            <li><strong>Not shown</strong>Water flow, pump condition, weather — no sensor exists for them yet, so the interface says NOT AVAILABLE rather than guessing</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ================================================== 5. benefits -->
+      <section class="section section-alt" id="benefits">
+        <div class="container">
+          <p class="section-label">Benefits</p>
+          <h2>What the system actually does, stated plainly.</h2>
+          <p class="section-lede">
+            Every line below is implemented and covered by the firmware's automated test suite —
+            a fact about the code, not a projection about a farm.
+          </p>
+
+          <div class="benefit-rows" data-reveal-group="fade-up" data-reveal-stagger="70">
+            <div class="benefit-row">
+              <h3>Local-first</h3>
               <p>
-                <strong>The dashboard is a monitoring layer, not a link in this chain.</strong> It
-                reads what the controller reports; it holds no command path back into it.
+                The irrigation controller holds no reference to Wi-Fi or HTTP. A host test runs a
+                complete irrigation cycle with no network object present at all, at any point in
+                the process.
+              </p>
+            </div>
+            <div class="benefit-row">
+              <h3>Zone-based</h3>
+              <p>
+                Each zone holds its own thresholds and its own state. When more than one reads
+                dry, the driest is served first — one at a time, because there is one pump.
+              </p>
+            </div>
+            <div class="benefit-row">
+              <h3>Hysteresis</h3>
+              <p>
+                Starting and stopping use two different thresholds, not one setpoint, so a reading
+                sitting at the boundary doesn't switch the pump on and off repeatedly.
+              </p>
+            </div>
+            <div class="benefit-row">
+              <h3>Runtime protection</h3>
+              <p>
+                A maximum runtime cuts the pump if a run goes long, and locks that zone out until
+                it has been reviewed — a bounded worst case, not an assumption of a happy path.
+              </p>
+            </div>
+            <div class="benefit-row">
+              <h3>Offline operation</h3>
+              <p>
+                None of the above depends on a network connection reaching the farm at all — the
+                controller decides alone, and reports what it did once the link is back.
               </p>
             </div>
           </div>
-
-          <div class="device-stage" data-reveal="fade-left">
-            <div class="device-glow" aria-hidden="true"></div>
-            <svg class="device-illustration" viewBox="0 0 560 440" role="img" aria-hidden="true">
-              <use href="#hydrax-device" />
-            </svg>
-          </div>
         </div>
       </section>
 
-      <!-- ================================================== 5. edge intelligence -->
-      <section class="section section-dark" id="edge">
-        <div class="container">
-          <div class="edge-headline">
-            <p class="section-label">Edge intelligence</p>
-            <h2>The decision stays in the field.</h2>
-            <p class="lede dim-on-dark">
-              The controller owns the irrigation decision, start to finish. The network exists to
-              show you that decision after it's made — never to make it.
-            </p>
-          </div>
-
-          <div class="edge-paths">
-            <div class="edge-path is-control" data-reveal="fade-up">
-              <span class="edge-path-label">Control path</span>
-              <div class="edge-nodes">
-                <span class="edge-node">Controller</span>
-                <span class="edge-connector"></span>
-                <span class="edge-node">Local decision</span>
-                <span class="edge-connector"></span>
-                <span class="edge-node">Valve</span>
-              </div>
-            </div>
-            <div class="edge-path is-monitor" data-reveal="fade-up" data-reveal-delay="90">
-              <span class="edge-path-label">Monitoring path</span>
-              <div class="edge-nodes">
-                <span class="edge-node">Controller</span>
-                <span class="edge-connector"></span>
-                <span class="edge-node">Dashboard</span>
-              </div>
-            </div>
-          </div>
-
-          <p class="edge-footnote">
-            <strong>These are drawn as two separate rows on purpose.</strong> The irrigation
-            controller holds no reference to Wi-Fi or HTTP at all — a test in the firmware suite
-            runs a full irrigation cycle with no network object present, at any point, in the
-            process. Whatever happens to the second row, the first keeps running.
-          </p>
-        </div>
-      </section>
-
-      <!-- ================================================== 6. from soil to valve -->
-      <section class="section section-alt" id="flow">
-        <div class="container">
-          <p class="section-label">From soil to valve</p>
-          <h2>One zone, followed end to end.</h2>
-          <p class="section-lede">
-            Everything below is threshold-based control, not prediction. Nothing here is
-            described as AI, and no accuracy figure is claimed for any of it.
-          </p>
-
-          <div class="zone-flow-wrap">
-            <div class="zone-flow" id="zone-flow" data-reveal-group="fade-up" data-reveal-stagger="55">
-              <div class="zf-step"><span class="zf-icon"><svg><use href="#icon-sensor" /></svg></span><span class="zf-title">SOIL MOISTURE</span><span class="zf-detail">Below the zone's start threshold</span></div>
-              <span class="zf-arrow"><svg><use href="#icon-arrow" /></svg></span>
-              <div class="zf-step"><span class="zf-icon"><svg><use href="#icon-sensor" /></svg></span><span class="zf-title">SENSOR</span><span class="zf-detail">Two probes, median-filtered and range-checked</span></div>
-              <span class="zf-arrow"><svg><use href="#icon-arrow" /></svg></span>
-              <div class="zf-step"><span class="zf-icon"><svg><use href="#icon-cpu" /></svg></span><span class="zf-title">CONTROLLER</span><span class="zf-detail">Aggregates valid probes into one reading</span></div>
-              <span class="zf-arrow"><svg><use href="#icon-arrow" /></svg></span>
-              <div class="zf-step"><span class="zf-icon"><svg><use href="#icon-branch" /></svg></span><span class="zf-title">DECISION</span><span class="zf-detail">Hysteresis band, cooldown and runtime checked</span></div>
-              <span class="zf-arrow"><svg><use href="#icon-arrow" /></svg></span>
-              <div class="zf-step"><span class="zf-icon"><svg><use href="#icon-valve" /></svg></span><span class="zf-title">VALVE</span><span class="zf-detail">Opens before the pump, one zone at a time</span></div>
-              <span class="zf-arrow"><svg><use href="#icon-arrow" /></svg></span>
-              <div class="zf-step"><span class="zf-icon"><svg><use href="#icon-flow" /></svg></span><span class="zf-title">WATER</span><span class="zf-detail">Reaches the zone the controller selected</span></div>
-            </div>
-          </div>
-
-          <div class="zone-flow-notes">
-            <div class="zf-note">
-              <h3>Hysteresis, not a setpoint</h3>
-              <p>Irrigation starts below a start threshold and stops at a higher stop threshold. A single setpoint would switch the pump on and off repeatedly at the boundary.</p>
-            </div>
-            <div class="zf-note">
-              <h3>Runtime protection</h3>
-              <p>A maximum runtime cuts the pump if a run goes long, and locks the zone out until it has been reviewed — bounding the worst case rather than trusting the happy path.</p>
-            </div>
-            <div class="zf-note">
-              <h3>Cooldown</h3>
-              <p>A minimum time between runs on the same zone is enforced independently of the threshold band, so a noisy reading cannot restart a zone immediately.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ================================================== 7. live monitoring -->
-      <section class="section" id="dashboard">
-        <div class="container monitor-grid">
-          <div>
-            <p class="section-label">Live monitoring</p>
-            <h2>See what the field sees.</h2>
-            <p class="section-lede">
-              This is an actual capture of the dashboard shipped with this system, running
-              against the simulation fixture on this same server — labelled as such, in the
-              interface itself, not cropped out for the screenshot.
-            </p>
-            <div class="monitor-frame" data-reveal="fade-up">
-              <div class="monitor-frame-bar">
-                <span class="monitor-dot"></span><span class="monitor-dot"></span><span class="monitor-dot"></span>
-                <span class="monitor-frame-title">HYDRAX — Farm Monitoring &amp; Control</span>
-              </div>
-              <img
-                src="/dashboard-preview.png"
-                width="1600" height="1000"
-                alt="HYDRAX dashboard overview showing system status, soil moisture, the live SENSE–UNDERSTAND–DECIDE–ACT–MONITOR loop, and active alerts, with a DEMO / SIMULATION badge because this capture runs on the mock-device fixture"
-                loading="lazy"
-              />
-            </div>
-          </div>
-
-          <div class="monitor-copy">
-            <h3>What it actually shows</h3>
-            <ul class="monitor-list">
-              <li>System status and device connectivity</li>
-              <li>Soil moisture per zone, and the farm average</li>
-              <li>The irrigation state — idle, starting, irrigating, stopped, faulted</li>
-              <li>Per-zone valve state and sensor coverage</li>
-              <li>Alerts and a filterable event timeline</li>
-            </ul>
-            <a class="btn btn-outline" href="/dashboard">Open the dashboard</a>
-            <p class="monitor-note">
-              <strong>Not shown, because it doesn't exist on this device:</strong> water flow,
-              pump current or temperature, weather data, and remote start/stop. The interface has
-              a place for each of them and reports <strong>NOT AVAILABLE</strong> until the
-              sensor behind it does.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <!-- ================================================== 8. built for the field -->
-      <section class="section section-alt" id="built">
+      <!-- ================================================== 6. built for the field -->
+      <section class="section" id="field">
         <div class="container">
           <p class="section-label">Built for the field</p>
-          <h2>What the system actually does today.</h2>
+          <h2>Designed for real conditions, not a demo bench.</h2>
           <p class="section-lede">
-            Every line below is implemented and covered by the automated firmware test suite —
-            see <a href="#status">Engineering status</a> for the count.
+            The engineering exists to be checked, not taken on faith — including the parts still
+            in progress. The controller compiles for its target hardware and is verified against
+            50 firmware tests; running on a physical board, and calibrating each probe against
+            real soil, is the next step, not a claimed one.
           </p>
 
-          <div class="field-grid" data-reveal-group="fade-up" data-reveal-stagger="60">
-            <article class="field-feature is-lead">
-              <div>
-                <span class="field-feature-num">01</span>
-                <h3>Local-first</h3>
-                <p>
-                  The irrigation controller holds no reference to Wi-Fi or HTTP. A host test runs
-                  a complete irrigation cycle with no network object present at all, at any point
-                  in the process.
-                </p>
-              </div>
-              <svg class="mini-diagram" viewBox="0 0 200 90" aria-hidden="true">
-                <rect class="d-unit d-unit-strong" x="10" y="20" width="70" height="50" rx="8" />
-                <text x="45" y="50" text-anchor="middle" class="d-tag d-tag-accent" font-size="9">CONTROLLER</text>
-                <path class="d-line d-line-dashed" d="M80 45 H190" stroke="var(--line-strong)" />
-                <circle cx="190" cy="45" r="5" fill="var(--line-strong)" />
-                <text x="190" y="30" text-anchor="end" class="d-tag" font-size="8">NETWORK · OPTIONAL</text>
-              </svg>
-            </article>
-
-            <article class="field-feature">
-              <span class="field-feature-num">02</span>
-              <h3>Zone-based</h3>
-              <p>Each irrigation zone has its own thresholds and its own state, monitored and served independently.</p>
-            </article>
-            <article class="field-feature">
-              <span class="field-feature-num">03</span>
-              <h3>Hysteresis</h3>
-              <p>A start/stop band, not a single setpoint, reduces unnecessary switching right at the threshold.</p>
-            </article>
-            <article class="field-feature">
-              <span class="field-feature-num">04</span>
-              <h3>Runtime protection</h3>
-              <p>The controller limits how long a zone can run continuously, per the implemented safety logic.</p>
-            </article>
-            <article class="field-feature">
-              <span class="field-feature-num">05</span>
-              <h3>Offline operation</h3>
-              <p>Critical irrigation logic does not depend on internet availability — the controller decides alone.</p>
-            </article>
+          <div class="field-gallery" data-reveal-group="fade-up" data-reveal-stagger="90">
+            <div class="field-photo is-tall">
+              <img
+                src="/assets/crop-rows-sunset.jpg"
+                alt="Cultivated rows stretching to the horizon at golden hour"
+                width="2000" height="1546"
+              />
+              <p class="field-photo-caption">Cultivated rows, golden hour</p>
+            </div>
+            <div class="field-photo is-wide">
+              <img
+                src="/assets/irrigation-sprinkler.jpg"
+                alt="Center-pivot irrigation rig watering a green crop field"
+                width="2000" height="1126"
+              />
+              <p class="field-photo-caption">Center-pivot irrigation, in operation</p>
+            </div>
           </div>
+
+          <dl class="verify-strip" id="verify-strip">
+            <div class="verify-item"><dt data-count-up="50">0</dt><dd>firmware tests</dd></div>
+            <div class="verify-item"><dt data-count-up="1082">0</dt><dd>assertions on the control logic</dd></div>
+            <div class="verify-item"><dt data-count-up="129">0</dt><dd>backend tests</dd></div>
+            <div class="verify-item"><dt data-count-up="0">0</dt><dd>cloud dependencies in the control path</dd></div>
+          </dl>
+          <p class="verify-note">Counts from the automated test suites in the repository — a measurement of the software, not of field performance.</p>
         </div>
       </section>
 
-      <!-- ================================================== 9. engineering status / trust -->
-      <section class="section" id="status">
-        <div class="container">
-          <p class="section-label">Engineering status</p>
-          <h2>Where the project actually stands.</h2>
-          <p class="section-lede">
-            Stated plainly, split the way it should be judged — because a reviewer can check
-            every line of it against the repository.
+      <!-- ================================================== 7. final cta -->
+      <section class="section section-alt section-final" id="contact">
+        <div class="container final-inner">
+          <p class="section-label" style="justify-content: center;">Get in touch</p>
+          <h2>Tell us about your farm.</h2>
+          <p class="lede">
+            Send your zone count and how you irrigate today, and we will come back with a
+            specific configuration and quote. No account, no obligation.
           </p>
+          <a class="btn btn-primary btn-lg" href="/request">Request a HYDRAX System</a>
 
-          <div class="trust-split">
-            <div class="trust-col trust-col-verified">
-              <div class="trust-col-head">
-                <span class="trust-dot"></span>
-                <span class="trust-col-title">Verified in software</span>
-              </div>
-              <div class="trust-item">
-                <h3>Control firmware</h3>
-                <p>Sensing, calibration, filtering, fault handling, zone logic, the irrigation state machine and every safety interlock — <strong>50 host tests, 1,082 assertions</strong>.</p>
-              </div>
-              <div class="trust-item">
-                <h3>Backend and dashboard</h3>
-                <p>Telemetry ingestion with strict validation, history, events, alerts, and the seven-section monitoring interface — <strong>129 backend tests</strong>.</p>
-              </div>
-              <div class="trust-item">
-                <h3>Cross-compiled for the target</h3>
-                <p>The firmware builds clean for the ESP32 across four configurations: device, simulation, bench-timing and commissioning.</p>
-              </div>
-            </div>
-
-            <div class="trust-col trust-col-pending">
-              <div class="trust-col-head">
-                <span class="trust-dot"></span>
-                <span class="trust-col-title">Pending hardware validation</span>
-              </div>
-              <div class="trust-item">
-                <h3>On-target execution</h3>
-                <p>The firmware <strong>compiles</strong> for the ESP32; it has not yet <strong>run</strong> on one. A written commissioning and fault-injection procedure exists and is ready for it.</p>
-              </div>
-              <div class="trust-item">
-                <h3>Per-probe calibration</h3>
-                <p>Each capacitive probe needs a dry/wet reference taken from the real unit before its reading means anything — that requires the physical probe in hand.</p>
-              </div>
-              <div class="trust-item">
-                <h3>Flow measurement and pump condition</h3>
-                <p>No flow meter, current sensor or vibration sensor exists in the current bill of materials — the prerequisite for either water accounting or condition monitoring.</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="trust-honesty" id="product">
-            <p class="trust-honesty-label">A design decision worth stating</p>
-            <p>
-              <strong>We have not published a water-saving figure, and will not until we have
-              measured one.</strong> Doing that credibly needs a flow meter, a control plot on the
-              existing schedule, and a full season of data — none of which exist yet. Predictive
-              maintenance and leak localization are architected for, not implemented, and neither
-              is claimed here.
-            </p>
-            <p>
-              The same rule governs every reading with no sensor behind it: it displays
-              <strong>NOT AVAILABLE</strong>, not a zero and not an estimate. That is the actual
-              interface — see the capture above.
-            </p>
-          </div>
-
-          <div class="trust-metrics">
-            <div class="trust-metric">
-              <span class="trust-metric-value">50</span>
-              <span class="trust-metric-label">firmware tests</span>
-              <span class="trust-metric-note">1,082 assertions on the control logic</span>
-            </div>
-            <div class="trust-metric">
-              <span class="trust-metric-value">129</span>
-              <span class="trust-metric-label">backend tests</span>
-              <span class="trust-metric-note">validation, API, alerts, reliability</span>
-            </div>
-            <div class="trust-metric">
-              <span class="trust-metric-value">4</span>
-              <span class="trust-metric-label">firmware builds</span>
-              <span class="trust-metric-note">device, simulation, bench, commissioning</span>
-            </div>
-            <div class="trust-metric">
-              <span class="trust-metric-value">0</span>
-              <span class="trust-metric-label">cloud dependencies in the control path</span>
-              <span class="trust-metric-note">verified by test, not by claim</span>
-            </div>
-          </div>
-          <p class="trust-metrics-note">
-            Counts from the automated test suites in the repository — measurements of the
-            software, not of field performance.
-          </p>
-
-          <div class="package-strip">
-            <div class="package-col">
-              <h3>Hardware</h3>
-              <ul class="ticks compact">
-                <li>ESP32 controller unit</li>
-                <li>4 × capacitive soil probes (2 per zone)</li>
-                <li>2 × solenoid valve driver channels</li>
-                <li>1 × pump driver channel, 12 V system</li>
-              </ul>
-            </div>
-            <div class="package-col">
-              <h3>Software</h3>
-              <ul class="ticks compact">
-                <li>Controller firmware, local irrigation control</li>
-                <li>Backend for telemetry, history and alerts</li>
-                <li>Seven-section monitoring dashboard</li>
-                <li>Runs entirely on your own network</li>
-              </ul>
-            </div>
-            <div class="package-col">
-              <h3>With the system</h3>
-              <ul class="ticks compact">
-                <li>Commissioning procedure per probe and actuator</li>
-                <li>Per-probe calibration procedure</li>
-                <li>Wiring, pin and configuration reference</li>
-              </ul>
-            </div>
-          </div>
-          <p class="package-note">
-            Pricing is quoted per farm: zone count, pump size, cable runs and enclosure
-            requirements change the bill of materials enough that one list price would be
-            misleading. <a href="/request">Request a quote</a> and tell us about your site.
-          </p>
-        </div>
-      </section>
-
-      <!-- ================================================== 10. final cta -->
-      <section class="section section-final" id="contact">
-        <div class="container final-grid">
-          <div class="final-cta-headline">
-            <p class="section-label">Get in touch</p>
-            <h2>Tell us about your farm.</h2>
-            <p class="section-lede">
-              Send your zone count and how you irrigate today, and we will come back with a
-              specific configuration and quote. No account, no obligation.
-            </p>
-            <a class="btn btn-primary btn-lg" href="/request">Request a HYDRAX System</a>
-          </div>
-
-          <div class="contact-details">
-            <h3>Direct contact</h3>
-            <dl class="contact-list">
+          <dl class="final-contact">
+            <div class="final-contact-item">
               <dt>Email</dt>
               <dd><a href="mailto:ingeniummteam@email.com">ingeniummteam@email.com</a></dd>
+            </div>
+            <div class="final-contact-item">
               <dt>Phone</dt>
               <dd><a href="tel:+201279159200">0127 915 9200</a></dd>
+            </div>
+            <div class="final-contact-item">
               <dt>Location</dt>
               <dd>Mansoura</dd>
-            </dl>
-            <p class="contact-note">We respond to every request personally — no ticketing system, no auto-replies.</p>
-          </div>
+            </div>
+          </dl>
         </div>
       </section>
     </main>
@@ -685,31 +359,35 @@
     <footer class="footer">
       <div class="container footer-inner">
         <div class="footer-brand">
-          <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true">
-            <path d="M50 14 C50 14 76 44 76 62 a26 26 0 0 1-52 0 C24 44 50 14 50 14Z" />
-          </svg>
+          <img class="brand-mark-img" src="/assets/logo.jpeg" alt="" aria-hidden="true" />
           <div>
-            <p class="brand-name">HYDRAX</p>
-            <p class="footer-tag">SmartFarm Guardian — irrigation that decides at the edge.</p>
+            <p class="footer-brand-name">HYDRAX</p>
+            <p class="footer-tag">Water that lets every field thrive.</p>
           </div>
         </div>
 
         <nav class="footer-links" aria-label="Footer">
           <a href="#problem">Problem</a>
           <a href="#how">How it works</a>
-          <a href="#built">Features</a>
-          <a href="#system">Technology</a>
-          <a href="#status">Status</a>
+          <a href="#product">Product</a>
+          <a href="#benefits">Benefits</a>
+          <a href="#field">Built for the field</a>
           <a href="/dashboard">Dashboard</a>
-          <a href="/request">Request a HYDRAX System</a>
+          <a href="/request">Request a System</a>
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
         </nav>
       </div>
       <div class="container footer-legal">
         <p>
-          Relative soil moisture is measured between a dry-air and a submerged reference per probe.
-          It is not volumetric water content, and is not presented as such anywhere in this system.
+          Relative soil moisture is measured between a dry-air and a submerged reference per
+          probe. It is not volumetric water content, and is not presented as such anywhere in
+          this system.
+        </p>
+        <p style="margin-top: 8px;">
+          Photography: Bernd Dittrich, Mostafijur Rahman Nasim, Aaron Burden, Lumin Osity and Dan
+          Meyers, via Unsplash — used under the Unsplash License. These images illustrate
+          agriculture and irrigation in general; none depict a HYDRAX installation.
         </p>
       </div>
     </footer>
