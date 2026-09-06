@@ -17,6 +17,15 @@
  * Usage:
  *   node tools/mock-device.ts [--url http://127.0.0.1:8080] [--key KEY]
  *                             [--device HYDRAX-SIM-1] [--interval 3000]
+ *
+ * The device key defaults to `process.env.HYDRAX_DEVICE_KEY` — it must be
+ * the SAME value the backend was started with (see auth.ts's
+ * `authorizeDevice`), or every request is rejected with 401. `npm run
+ * mock-device` loads `backend/.env` first (via Node's own
+ * `--env-file-if-exists` flag, the same way `npm start`/`npm test` do) so
+ * this picks up whatever `HYDRAX_DEVICE_KEY` the backend is actually
+ * running with. Running this file directly with plain `node` skips that —
+ * pass `--key` explicitly in that case, or export the variable yourself.
  */
 
 interface Options {

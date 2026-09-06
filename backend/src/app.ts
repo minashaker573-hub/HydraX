@@ -15,7 +15,9 @@ import { registerAlertRoutes } from './routes/alerts.ts';
 import { registerDashboardRoutes } from './routes/dashboard.ts';
 import { registerDeviceRoutes } from './routes/devices.ts';
 import { registerIngestRoutes } from './routes/ingest.ts';
+import { registerMediaRoutes } from './routes/media.ts';
 import { registerQuoteRoutes } from './routes/quotes.ts';
+import { registerWebsiteContentRoutes } from './routes/website-content.ts';
 import type { AppDeps } from './deps.ts';
 
 export type RequestListener = (req: IncomingMessage, res: ServerResponse) => void;
@@ -60,6 +62,8 @@ export function createRouter(deps: AppDeps): Router {
   registerAlertRoutes(router, deps);
   registerDashboardRoutes(router, deps);
   registerQuoteRoutes(router, deps);
+  registerWebsiteContentRoutes(router, deps);
+  registerMediaRoutes(router, deps);
 
   return router;
 }

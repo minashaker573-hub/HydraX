@@ -33,6 +33,7 @@ import type {
   TelemetryPayload,
 } from '../domain/types.ts';
 import type { ZoneConfigInput } from '../domain/validate.ts';
+import type { SectionId } from '../domain/website-content.ts';
 import type { QueryResult, QueryResultRow } from 'pg';
 
 export interface DeviceRow {
@@ -122,6 +123,24 @@ export interface QuoteRequestRow {
 /** A stored request together with the capabilities it asked for. */
 export interface QuoteRequest extends QuoteRequestRow {
   capabilities: Capability[];
+}
+
+export interface WebsiteContentRow {
+  section: string;
+  status: 'draft' | 'published';
+  data: unknown;
+  updated_at: string;
+  published_at: string | null;
+}
+
+export interface MediaRow {
+  id: number;
+  filename: string;
+  original_name: string;
+  content_type: string;
+  size_bytes: number;
+  alt_text: string;
+  uploaded_at: string;
 }
 
 // node-postgres returns BIGINT/BIGSERIAL columns (telemetry.id and friends)
@@ -616,5 +635,142 @@ export class Repository {
       [status, now, reference],
     );
     return (result.rowCount ?? 0) > 0;
+  }
+
+  // -------------------------------------------------------------------------
+  // website content (CMS)
+  // -------------------------------------------------------------------------
+
+  async getWebsiteContent(section: SectionId, status: 'draft' | 'published'): Promise<WebsiteContentRow | undefined> {
+    const result = await this.#query<WebsiteContentRow>(
+      'SELECT * FROM website_content WHERE section = $1 AND status = $2',
+      [section, status],
+    );
+    return result.rows[0];
+  }
+
+  /** All sections at once, for a given status — the shape the public and
+   *  admin content endpoints both serve from. */
+  async listWebsiteContent(status: 'draft' | 'published'): Promise<WebsiteContentRow[]> {
+    const result = await this.#query<WebsiteContentRow>(
+      'SELECT * FROM website_content WHERE status = $1',
+      [status],
+    );
+    return result.rows;
+  }
+
+  /** Writes (or overwrites) one section's draft. Never touches 'published'. */
+  async saveWebsiteContentDraft(section: SectionId, data: unknown, now: string): Promise<void> {
+    await this.#query(
+      `INSERT INTO website_content (section, status, data, updated_at)
+       VALUES ($1, 'draft', $2, $3)
+       ON CONFLICT (section, status) DO UPDATE SET
+         data       = EXCLUDED.data,
+         updated_at = EXCLUDED.updated_at`,
+      [section, JSON.stringify(data), now],
+    );
+  }
+
+  /**
+   * Copies a section's current draft into its published row. Returns false
+   * if the section has no draft yet (nothing to publish) rather than
+   * inventing an empty one.
+   */
+  async publishWebsiteContent(section: SectionId, now: string): Promise<boolean> {
+    return this.#transaction(async (client) => {
+      const draft = await client.query<{ data: unknown }>(
+        'SELECT data FROM website_content WHERE section = $1 AND status = $2',
+        [section, 'draft'],
+      );
+      if (draft.rows[0] === undefined) return false;
+
+      await client.query(
+        `INSERT INTO website_content (section, status, data, updated_at, published_at)
+         VALUES ($1, 'published', $2, $3, $3)
+         ON CONFLICT (section, status) DO UPDATE SET
+           data         = EXCLUDED.data,
+           updated_at   = EXCLUDED.updated_at,
+           published_at = EXCLUDED.published_at`,
+        [section, draft.rows[0].data, now],
+      );
+      return true;
+    });
+  }
+
+  /**
+   * Seeds a section with the real current website copy if — and only if — it
+   * has never been touched: both draft and published are written, but each
+   * independently, with ON CONFLICT DO NOTHING, so this is safe to call on
+   * every boot without ever overwriting a real edit an admin already made.
+   * See domain/website-content-seed.ts for what gets written.
+   */
+  async seedWebsiteContentIfMissing(section: SectionId, data: unknown, now: string): Promise<void> {
+    const json = JSON.stringify(data);
+    await this.#transaction(async (client) => {
+      await client.query(
+        `INSERT INTO website_content (section, status, data, updated_at)
+         VALUES ($1, 'draft', $2, $3)
+         ON CONFLICT (section, status) DO NOTHING`,
+        [section, json, now],
+      );
+      await client.query(
+        `INSERT INTO website_content (section, status, data, updated_at, published_at)
+         VALUES ($1, 'published', $2, $3, $3)
+         ON CONFLICT (section, status) DO NOTHING`,
+        [section, json, now],
+      );
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // website media
+  // -------------------------------------------------------------------------
+
+  async insertMedia(input: {
+    filename: string;
+    originalName: string;
+    contentType: string;
+    sizeBytes: number;
+    altText: string;
+  }, now: string): Promise<MediaRow> {
+    const result = await this.#query<MediaRow & { id: string }>(
+      `INSERT INTO website_media (filename, original_name, content_type, size_bytes, alt_text, uploaded_at)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [input.filename, input.originalName, input.contentType, input.sizeBytes, input.altText, now],
+    );
+    return toRow(result.rows[0]!);
+  }
+
+  async listMedia(): Promise<MediaRow[]> {
+    const result = await this.#query<MediaRow & { id: string }>(
+      'SELECT * FROM website_media ORDER BY uploaded_at DESC, id DESC',
+    );
+    return result.rows.map(toRow);
+  }
+
+  async getMedia(id: number): Promise<MediaRow | undefined> {
+    const result = await this.#query<MediaRow & { id: string }>('SELECT * FROM website_media WHERE id = $1', [id]);
+    return result.rows[0] === undefined ? undefined : toRow(result.rows[0]);
+  }
+
+  async deleteMedia(id: number): Promise<boolean> {
+    const result = await this.#query('DELETE FROM website_media WHERE id = $1', [id]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  /**
+   * True if `url` appears anywhere in any section's content — draft or
+   * published — so deleting the underlying file cannot silently break a live
+   * or in-progress page. A plain substring search over the JSON text: cheap,
+   * correct for this table's size, and does not need to know which fields in
+   * which sections happen to hold image references.
+   */
+  async isMediaReferenced(url: string): Promise<boolean> {
+    const result = await this.#query<{ n: string }>(
+      `SELECT COUNT(*) AS n FROM website_content WHERE data::text LIKE '%' || $1 || '%'`,
+      [url],
+    );
+    return Number(result.rows[0]!.n) > 0;
   }
 }

@@ -36,8 +36,10 @@ soil moisture sensors (4)
   (Overview, Smart Irrigation, Pump Health, Water Network, Safety Center,
   Alerts & Events, Device)
 
+- A read-only Android monitoring app ([docs/MOBILE.md](docs/MOBILE.md))
+
 Explicitly **not** in this phase: predictive maintenance, failure prediction,
-leak localization, mobile app, multi-farm SaaS. See
+leak localization, remote irrigation control, multi-farm SaaS. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#what-phase-1-deliberately-excludes).
 
 ---
@@ -58,6 +60,10 @@ backend/           Node 24 + TypeScript, one runtime dependency (pg, for Postgre
 dashboard/         static HTML/CSS/JS monitoring UI, served at /dashboard
 website/           public product website + quote request form, served at /
 admin/             operator console for quote requests, served at /admin
+mobile/            React Native (Expo) monitoring app for Android
+  app/             screens — file-based routing
+  src/api/         the only code that talks to the backend
+  src/state/       shared telemetry snapshot, polling, offline cache
 docs/              architecture, state machine, telemetry, hardware, testing
 ```
 
@@ -113,7 +119,26 @@ path, alert rules and dashboard can be exercised with no board attached. Every
 value it sends is tagged `simulated: true`, and the dashboard labels it as
 simulated.
 
-### 3. Firmware
+### 3. The mobile app
+
+Read-only monitoring on an Android phone. No Android Studio needed — install
+**Expo Go** from the Play Store, then, with the backend already running:
+
+```bash
+cd mobile
+npm install
+npm start
+```
+
+Scan the QR code with Expo Go. The phone must be on the same Wi-Fi as this
+computer; the app finds the backend by itself in that case. Step-by-step setup,
+including what to do when it does not, is in
+[docs/MOBILE.md](docs/MOBILE.md).
+
+The app is monitor-only and holds no credentials — it never sends the device or
+operator key. See [docs/MOBILE.md](docs/MOBILE.md#9-authentication).
+
+### 4. Firmware
 
 ```bash
 cd firmware
@@ -147,6 +172,12 @@ cd backend
 npm test
 npm run typecheck
 npm run check:dashboard
+
+# mobile app
+cd mobile
+npm test
+npm run typecheck
+npm run check:backend   # contract check against a RUNNING backend
 ```
 
 Full details, including what is and is not covered, in
@@ -160,6 +191,7 @@ Full details, including what is and is not covered, in
 | --- | --- |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, data flow, design decisions, offline behaviour |
 | [DASHBOARD.md](docs/DASHBOARD.md) | Dashboard sections, API/data mapping, demo mode, error states |
+| [MOBILE.md](docs/MOBILE.md) | Mobile app: setup, architecture, screens, authentication, ESP32 hand-off |
 | [WEBSITE.md](docs/WEBSITE.md) | Public site structure, design language, and the honesty guard |
 | [REQUESTS.md](docs/REQUESTS.md) | Customer quote flow, request API, operator console |
 | [STATE_MACHINE.md](docs/STATE_MACHINE.md) | Irrigation states and the full transition table |

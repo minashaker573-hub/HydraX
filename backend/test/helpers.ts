@@ -25,7 +25,8 @@
 import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { dirname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createApp } from '../src/app.ts';
@@ -92,6 +93,10 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     dashboardDir: resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'dashboard'),
     websiteDir: resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'website'),
     adminDir: resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'admin'),
+    // A real OS temp directory, not website/assets/uploads/ — a media test
+    // uploading real bytes to disk must not leave files behind in the actual
+    // project tree it happens to share a filesystem with.
+    mediaDir: join(tmpdir(), 'hydrax-test-media'),
     // High by default so ordinary tests are not throttled; the abuse test
     // overrides it to a small number deliberately.
     requestRateMax: 10_000,
@@ -314,6 +319,62 @@ export async function adminPatch(
     headers,
     body: JSON.stringify(body),
   });
+  const text = await response.text();
+  return { status: response.status, body: text === '' ? null : JSON.parse(text) };
+}
+
+/** PUT as an operator (X-Admin-Key). */
+export async function adminPut(
+  harness: Harness,
+  path: string,
+  body: unknown,
+  adminKey: string | null = TEST_ADMIN_KEY,
+): Promise<ApiResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (adminKey !== null) headers['X-Admin-Key'] = adminKey;
+
+  const response = await fetch(`${harness.baseUrl}${path}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(body),
+  });
+  const text = await response.text();
+  return { status: response.status, body: text === '' ? null : JSON.parse(text) };
+}
+
+/** DELETE as an operator (X-Admin-Key). */
+export async function adminDelete(
+  harness: Harness,
+  path: string,
+  adminKey: string | null = TEST_ADMIN_KEY,
+): Promise<ApiResponse> {
+  const headers: Record<string, string> = {};
+  if (adminKey !== null) headers['X-Admin-Key'] = adminKey;
+
+  const response = await fetch(`${harness.baseUrl}${path}`, { method: 'DELETE', headers });
+  const text = await response.text();
+  return { status: response.status, body: text === '' ? null : JSON.parse(text) };
+}
+
+/**
+ * Uploads raw bytes as an operator, mirroring how the admin console's media
+ * uploader actually sends a file — see http/upload.ts and routes/media.ts.
+ */
+export async function adminUpload(
+  harness: Harness,
+  path: string,
+  bytes: Buffer,
+  contentType: string,
+  { originalName = 'test.jpg', altText = '', adminKey = TEST_ADMIN_KEY as string | null } = {},
+): Promise<ApiResponse> {
+  const headers: Record<string, string> = {
+    'Content-Type': contentType,
+    'X-Original-Filename': originalName,
+    'X-Alt-Text': altText,
+  };
+  if (adminKey !== null) headers['X-Admin-Key'] = adminKey;
+
+  const response = await fetch(`${harness.baseUrl}${path}`, { method: 'POST', headers, body: bytes });
   const text = await response.text();
   return { status: response.status, body: text === '' ? null : JSON.parse(text) };
 }

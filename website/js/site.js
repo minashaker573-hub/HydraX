@@ -71,15 +71,30 @@ if (schematic instanceof SVGElement && 'IntersectionObserver' in window) {
 
 /* --------------------------------------------------- active section state -- */
 
-const navAnchors = Array.from(document.querySelectorAll('.nav-links a[href^="#"]'));
-const sections = navAnchors
-  .map((anchor) => document.querySelector(anchor.getAttribute('href')))
-  .filter((node) => node instanceof HTMLElement);
+// #nav-links' children can be rebuilt entirely after this script has already
+// run — the CMS's nav items load asynchronously (js/content.js), and can be
+// rebuilt again by a language switch or an admin's live preview. Anchors
+// captured once at module load would go stale: their nodes get removed from
+// the document, so toggling a class on them would have no visible effect,
+// and the *new* anchors would never get highlighted at all. This re-reads
+// whichever anchors are actually in the document right now, every time
+// something says the nav changed (`hydrax:nav-updated`) — and always
+// matches by each anchor's own href/section id, never by its position in
+// the list, so a reordered nav still highlights the right item.
+let activeNavObserver = null;
 
-if (sections.length > 0 && 'IntersectionObserver' in window) {
+function setupActiveNavHighlighting() {
+  const navAnchors = Array.from(document.querySelectorAll('.nav-links a[href^="#"]'));
+  const sections = navAnchors
+    .map((anchor) => document.querySelector(anchor.getAttribute('href')))
+    .filter((node) => node instanceof HTMLElement);
+
+  if (activeNavObserver) activeNavObserver.disconnect();
+  if (sections.length === 0 || !('IntersectionObserver' in window)) return;
+
   const visible = new Set();
 
-  const observer = new IntersectionObserver(
+  activeNavObserver = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) visible.add(entry.target.id);
@@ -97,8 +112,11 @@ if (sections.length > 0 && 'IntersectionObserver' in window) {
     { rootMargin: '-72px 0px -55% 0px', threshold: 0 },
   );
 
-  for (const section of sections) observer.observe(section);
+  for (const section of sections) activeNavObserver.observe(section);
 }
+
+setupActiveNavHighlighting();
+document.addEventListener('hydrax:nav-updated', setupActiveNavHighlighting);
 
 /* --------------------------------------------------------- sticky mobile CTA -- */
 

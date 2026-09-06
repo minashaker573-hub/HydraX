@@ -19,6 +19,17 @@
  *
  * The hero's own slow drift/zoom and the confirmation checkmark are plain
  * CSS animations (see styles.css) — no JS needed for those.
+ *
+ * js/content.js can rebuild the children of a `data-reveal-group` container
+ * (the how-steps list, the benefit rows) after this file has already set up
+ * its observers. Both `revealGroup()` and the count-up observer below read
+ * their target's children lazily, inside the IntersectionObserver callback —
+ * not at setup time — so a rebuild that finishes before the container
+ * actually scrolls into view is already safe on its own. The one gap that
+ * doesn't cover is a container already in the viewport at page load, before
+ * the CMS fetch resolves — so setup itself waits for content.js's
+ * `hydrax:content-ready` signal (or a short timeout, so a slow/broken CMS
+ * fetch never leaves the whole page unanimated).
  */
 
 import { animate, stagger } from './vendor/animejs/anime.esm.min.js';
@@ -31,11 +42,28 @@ function reducedMotion() {
   }
 }
 
+const CONTENT_READY_TIMEOUT_MS = 1200;
+
+function whenContentReady(callback) {
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    callback();
+  };
+  document.addEventListener('hydrax:content-ready', finish, { once: true });
+  setTimeout(finish, CONTENT_READY_TIMEOUT_MS);
+}
+
 if (reducedMotion() || !('IntersectionObserver' in window)) {
   // Nothing to do: every element this file would animate already renders at
   // full opacity in its resting position via plain CSS — there is no
   // "stuck invisible" state to recover from by skipping this.
 } else {
+  whenContentReady(setupAnimations);
+}
+
+function setupAnimations() {
   const OFFSETS = {
     'fade-up': { opacity: [0, 1], translateY: [18, 0] },
     'fade-right': { opacity: [0, 1], translateX: [-22, 0] },

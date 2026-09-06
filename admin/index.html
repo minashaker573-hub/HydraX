@@ -59,25 +59,64 @@
 
       <!-- ===================================================== console -->
       <section class="console" id="console" hidden>
-        <div class="console-head">
-          <h1>Quote requests</h1>
-          <button class="btn btn-outline" id="refresh" type="button">Refresh</button>
+        <div class="tabs" id="admin-tabs" role="tablist">
+          <button class="tab is-active" type="button" role="tab" aria-selected="true" data-tab="requests">
+            Quote requests
+          </button>
+          <button class="tab" type="button" role="tab" aria-selected="false" data-tab="cms">
+            Website content
+          </button>
         </div>
 
-        <div class="counts" id="counts"></div>
+        <div class="tab-panel" id="panel-requests">
+          <div class="console-head">
+            <h1>Quote requests</h1>
+            <button class="btn btn-outline" id="refresh" type="button">Refresh</button>
+          </div>
 
-        <div class="filters" id="filters">
-          <button class="filter" type="button" data-status="ALL" aria-pressed="true">All</button>
-          <button class="filter" type="button" data-status="NEW" aria-pressed="false">New</button>
-          <button class="filter" type="button" data-status="CONTACTED" aria-pressed="false">Contacted</button>
-          <button class="filter" type="button" data-status="QUOTED" aria-pressed="false">Quoted</button>
-          <button class="filter" type="button" data-status="CLOSED" aria-pressed="false">Closed</button>
+          <div class="counts" id="counts"></div>
+
+          <div class="filters" id="filters">
+            <button class="filter" type="button" data-status="ALL" aria-pressed="true">All</button>
+            <button class="filter" type="button" data-status="NEW" aria-pressed="false">New</button>
+            <button class="filter" type="button" data-status="CONTACTED" aria-pressed="false">Contacted</button>
+            <button class="filter" type="button" data-status="QUOTED" aria-pressed="false">Quoted</button>
+            <button class="filter" type="button" data-status="CLOSED" aria-pressed="false">Closed</button>
+          </div>
+
+          <div id="list" aria-live="polite"></div>
         </div>
 
-        <div id="list" aria-live="polite"></div>
+        <!-- ================================================ website CMS -->
+        <div class="tab-panel" id="panel-cms" hidden>
+          <div class="console-head">
+            <h1>Website content</h1>
+            <span class="cms-hint">Edits the live public site's text, images and section order — not its layout or code.</span>
+            <button class="btn btn-outline" id="cms-preview-open" type="button">Preview site</button>
+          </div>
+
+          <div class="cms-layout">
+            <nav class="cms-nav" id="cms-nav" aria-label="Website content sections"></nav>
+            <div class="cms-editor" id="cms-editor">
+              <p class="cms-placeholder">Choose a section on the left to edit its content.</p>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
 
+    <!-- Full-site preview: the real public page, rendered with the in-progress
+         draft fed to it over postMessage — never a second copy of the markup,
+         and the draft is never exposed over the network to do this. -->
+    <div class="cms-preview" id="cms-preview" hidden>
+      <div class="cms-preview-bar">
+        <span>Preview — draft content, not the live site</span>
+        <button class="btn btn-ghost" id="cms-preview-close" type="button">Close</button>
+      </div>
+      <iframe class="cms-preview-frame" id="cms-preview-frame" title="Website preview"></iframe>
+    </div>
+
     <script type="module" src="/admin/js/admin.js"></script>
+    <script type="module" src="/admin/js/cms.js"></script>
   </body>
 </html>

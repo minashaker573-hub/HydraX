@@ -6,6 +6,7 @@
  */
 
 import { createServer } from 'node:http';
+import { mkdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -14,6 +15,8 @@ import { ConfigError, loadConfig } from './config.ts';
 import { closeDatabase, openDatabase } from './db/index.ts';
 import { Repository } from './db/repository.ts';
 import { sweepOfflineDevices } from './domain/alerts.ts';
+import { DEFAULT_WEBSITE_CONTENT } from './domain/website-content-seed.ts';
+import { SECTION_IDS } from './domain/website-content.ts';
 import { log } from './log.ts';
 import type { AppDeps } from './deps.ts';
 
@@ -48,6 +51,20 @@ async function main(): Promise<void> {
   const db = await openDatabase(config.databaseUrl);
   const repo = new Repository(db);
   const deps: AppDeps = { repo, config, now: () => Date.now() };
+
+  // The CMS's uploads directory lives under the website's own static root
+  // (see config.ts's `mediaDir` comment) and must exist before the first
+  // upload, not be created lazily mid-request.
+  await mkdir(config.mediaDir, { recursive: true });
+
+  // Seeds each website content section with the site's real current copy —
+  // a no-op for any section that has already been touched (draft or
+  // published), so this never overwrites a real edit. See
+  // domain/website-content-seed.ts.
+  const seedNow = new Date(Date.now()).toISOString();
+  for (const section of SECTION_IDS) {
+    await repo.seedWebsiteContentIfMissing(section, DEFAULT_WEBSITE_CONTENT[section], seedNow);
+  }
 
   const server = createServer(createApp(deps));
 

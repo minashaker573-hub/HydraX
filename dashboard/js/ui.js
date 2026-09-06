@@ -144,6 +144,18 @@ export function card(title, ...children) {
   return node;
 }
 
+/**
+ * A card carrying live, load-bearing system state (the hero cluster, the
+ * farm schematic) rather than ordinary reference content — the technical
+ * bezel treatment (`.panel-tech`, corner ticks) instead of the flat card.
+ */
+export function panel(title, ...children) {
+  const node = el('div', 'card panel-tech');
+  if (title) node.appendChild(el('h3', 'card-title', title));
+  for (const child of children) if (child) node.appendChild(child);
+  return node;
+}
+
 export function section(title, note, ...children) {
   const node = el('section', 'section');
   const head = el('div', 'section-head');
@@ -214,6 +226,12 @@ export function gauge(average, config) {
     band.style.left = `${start}%`;
     band.style.width = `${Math.max(0, stop - start)}%`;
     bar.appendChild(band);
+  }
+
+  for (const mark of [25, 50, 75]) {
+    const tick = el('div', 'gauge-mark');
+    tick.style.left = `${mark}%`;
+    bar.appendChild(tick);
   }
 
   if (isNum(average)) {
@@ -348,11 +366,38 @@ export function moistureChart(series, { height = 200 } = {}) {
  * Schematic farm layout. Deliberately flat and diagrammatic: it encodes zone
  * moisture, valve state and irrigation activity, and nothing else. Kept in a
  * fixed LTR orientation for the same reason as the gauge and chart above.
+ *
+ * Zones are laid out two per row, with the row count following the number of
+ * zones the controller actually reports — the diagram is a real piping
+ * schematic that scales with the farm, not a fixed two-slot mockup.
  */
 export function farmSchematic(device) {
   const zones = device.zones || [];
-  const width = 620;
-  const height = 210;
+  const perRow = 2;
+  const columns = Math.max(1, Math.min(perRow, zones.length));
+  const rows = Math.max(1, Math.ceil(zones.length / perRow));
+
+  const zoneW = 190;
+  const zoneH = 78;
+  const rowGap = 26;
+  const colGap = 44;
+  const startX = 176;
+  const topPad = 22;
+  const manifoldOffset = 14;
+  const width = startX + columns * zoneW + (columns - 1) * colGap + 20;
+  const height = topPad + rows * zoneH + (rows - 1) * rowGap + 8;
+  const trunkX = 150;
+  const rowManifoldY = (r) => topPad + r * (zoneH + rowGap) - manifoldOffset;
+  // The pump sits centered on the zone boxes themselves (never on the
+  // manifold lines, which sit in the narrow gap above them) so its box
+  // always has clearance; the vertical trunk then simply spans from the
+  // pump's connection point to the first/last row's manifold, whichever is
+  // further, which keeps every row reachable at any zone count.
+  const firstBoxMidY = topPad + zoneH / 2;
+  const lastBoxMidY = topPad + (rows - 1) * (zoneH + rowGap) + zoneH / 2;
+  const pumpMidY = (firstBoxMidY + lastBoxMidY) / 2;
+  const trunkTop = Math.min(pumpMidY, rowManifoldY(0));
+  const trunkBottom = Math.max(pumpMidY, rowManifoldY(rows - 1));
 
   const root = svg('svg', {
     class: 'farm',
@@ -366,45 +411,71 @@ export function farmSchematic(device) {
   const pumpColor = pumpOn ? 'var(--water)' : 'var(--border-strong)';
 
   root.appendChild(svg('rect', {
-    x: 14, y: 78, width: 78, height: 54, rx: 6,
+    x: 14, y: pumpMidY - 27, width: 78, height: 54, rx: 4,
     fill: 'var(--surface-2)', stroke: pumpColor, 'stroke-width': pumpOn ? 2 : 1,
   }));
-  const pumpLabel = svg('text', { x: 53, y: 100, 'text-anchor': 'middle', class: 'chart-axis' });
+  const pumpLabel = svg('text', { x: 53, y: pumpMidY - 5, 'text-anchor': 'middle', class: 'chart-axis' });
   pumpLabel.textContent = t('farm.pump');
   root.appendChild(pumpLabel);
   const pumpState = svg('text', {
-    x: 53, y: 118, 'text-anchor': 'middle', class: 'chart-axis',
+    x: 53, y: pumpMidY + 13, 'text-anchor': 'middle', class: 'chart-axis',
     fill: pumpOn ? 'var(--water)' : 'var(--dim)',
     'font-weight': '700',
   });
   pumpState.textContent = pumpOn ? t('farm.on') : t('farm.off');
   root.appendChild(pumpState);
 
-  // --- main line -----------------------------------------------------------
+  // --- main line + trunk (spans every row's manifold) -----------------------
   root.appendChild(svg('line', {
-    x1: 92, y1: 105, x2: 150, y2: 105,
+    x1: 92, y1: pumpMidY, x2: trunkX, y2: pumpMidY,
     stroke: pumpColor, 'stroke-width': pumpOn ? 3 : 2,
   }));
+  root.appendChild(svg('line', {
+    x1: trunkX, y1: trunkTop, x2: trunkX, y2: trunkBottom,
+    stroke: pumpOn ? 'var(--border-strong)' : 'var(--border)', 'stroke-width': 2,
+  }));
 
-  // --- zones ---------------------------------------------------------------
-  const zoneW = 190;
-  const zoneH = 82;
-  const startX = 176;
+  // --- zones, two per row, fed from a horizontal manifold per row -----------
+  // Each row gets its own manifold line sitting in the gap above its zone
+  // boxes; every zone in the row drops straight down from that manifold to
+  // its own valve. This is what keeps the diagram correct at any zone count
+  // instead of assuming exactly two zones side by side — a third zone (or a
+  // fifth row) never has to route its pipe through a neighbour's box.
+  for (let r = 0; r < rows; r += 1) {
+    const zonesInRow = zones.slice(r * perRow, r * perRow + perRow);
+    if (zonesInRow.length === 0) continue;
+    const manifoldY = rowManifoldY(r);
+    const rowFlowing = zonesInRow.some((z) => z.valve_open === true) && pumpOn;
+    const rightmostX = startX + (zonesInRow.length - 1) * (zoneW + colGap) - 20;
+    root.appendChild(svg('line', {
+      x1: trunkX, y1: manifoldY, x2: rightmostX, y2: manifoldY,
+      stroke: rowFlowing ? 'var(--water)' : 'var(--border-strong)',
+      'stroke-width': rowFlowing ? 2.5 : 1.5,
+    }));
+  }
 
-  zones.slice(0, 2).forEach((zone, i) => {
-    const zy = i === 0 ? 12 : 116;
+  // --- zones ------------------------------------------------------------
+  zones.forEach((zone, i) => {
+    const rowIndex = Math.floor(i / perRow);
+    const col = i % perRow;
+    const zx = startX + col * (zoneW + colGap);
+    const zy = topPad + rowIndex * (zoneH + rowGap);
+    const zoneMidY = zy + zoneH / 2;
+    const manifoldY = rowManifoldY(rowIndex);
     const flowing = zone.valve_open === true && pumpOn;
     const branchColor = flowing ? 'var(--water)' : 'var(--border-strong)';
+    const valveX = zx - 20;
 
-    // branch from the main line to this zone's valve
-    root.appendChild(svg('path', {
-      d: `M150 105 L150 ${zy + zoneH / 2} L${startX - 34} ${zy + zoneH / 2}`,
-      fill: 'none', stroke: branchColor, 'stroke-width': flowing ? 3 : 1.5,
+    // drop from this row's manifold straight down into the valve — never
+    // sideways through another zone's box
+    root.appendChild(svg('line', {
+      x1: valveX, y1: manifoldY, x2: valveX, y2: zoneMidY,
+      stroke: branchColor, 'stroke-width': flowing ? 3 : 1.5,
     }));
 
     // valve
     root.appendChild(svg('circle', {
-      cx: startX - 20, cy: zy + zoneH / 2, r: 9,
+      cx: valveX, cy: zoneMidY, r: 8,
       fill: zone.valve_open ? 'var(--water)' : 'var(--surface)',
       stroke: zone.valve_open ? 'var(--water)' : 'var(--border-strong)',
       'stroke-width': 2,
@@ -413,7 +484,7 @@ export function farmSchematic(device) {
     // zone body, tinted by moisture when a reading exists
     const avg = zone.average;
     root.appendChild(svg('rect', {
-      x: startX, y: zy, width: zoneW, height: zoneH, rx: 8,
+      x: zx, y: zy, width: zoneW, height: zoneH, rx: 4,
       fill: 'var(--surface-2)',
       stroke: zone.irrigating ? 'var(--water)' : 'var(--border)',
       'stroke-width': zone.irrigating ? 2 : 1,
@@ -423,25 +494,25 @@ export function farmSchematic(device) {
       // moisture fill: proportional, drawn from the bottom like a soil column
       const fillH = Math.max(2, (clamp(avg) / 100) * (zoneH - 8));
       root.appendChild(svg('rect', {
-        x: startX + 4, y: zy + zoneH - 4 - fillH, width: zoneW - 8, height: fillH, rx: 5,
+        x: zx + 4, y: zy + zoneH - 4 - fillH, width: zoneW - 8, height: fillH, rx: 3,
         fill: 'var(--water)', opacity: 0.13,
       }));
     }
 
-    const name = svg('text', { x: startX + 14, y: zy + 26, class: 'chart-axis', 'font-weight': '700' });
+    const name = svg('text', { x: zx + 14, y: zy + 24, class: 'chart-axis', 'font-weight': '700' });
     name.textContent = t('common.zone', { n: zone.zone });
     root.appendChild(name);
 
     const value = svg('text', {
-      x: startX + 14, y: zy + 56,
-      'font-size': '24', 'font-weight': '650',
-      fill: 'var(--ink)', 'font-family': 'var(--font-sans)',
+      x: zx + 14, y: zy + zoneH - 14,
+      'font-size': '22', 'font-weight': '650',
+      fill: 'var(--ink)', 'font-family': 'var(--font-mono)',
     });
     value.textContent = isNum(avg) ? `${avg.toFixed(1)}%` : '—';
     root.appendChild(value);
 
     const state = svg('text', {
-      x: startX + zoneW - 14, y: zy + 26, 'text-anchor': 'end', class: 'chart-axis',
+      x: zx + zoneW - 14, y: zy + 24, 'text-anchor': 'end', class: 'chart-axis',
       fill: zone.valve_open ? 'var(--water)' : 'var(--dim)', 'font-weight': '700',
     });
     state.textContent = zone.valve_open ? t('farm.valveOpen') : t('farm.valveClosed');
@@ -450,7 +521,7 @@ export function farmSchematic(device) {
     // coverage warning, only when genuinely degraded
     if (zone.valid_sensors < 2) {
       const warn = svg('text', {
-        x: startX + zoneW - 14, y: zy + zoneH - 12, 'text-anchor': 'end', class: 'chart-axis',
+        x: zx + zoneW - 14, y: zy + zoneH - 14, 'text-anchor': 'end', class: 'chart-axis',
         fill: zone.valid_sensors === 0 ? 'var(--crit)' : 'var(--warn)', 'font-weight': '700',
       });
       warn.textContent = zone.valid_sensors === 0 ? t('farm.noValidProbe') : t('farm.degraded');

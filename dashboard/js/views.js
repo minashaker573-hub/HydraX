@@ -50,6 +50,7 @@ import {
   kpi,
   moistureChart,
   notAvailable,
+  panel,
   pill,
   row,
   section,
@@ -223,9 +224,14 @@ export function overviewView(state, { onNavigate } = {}) {
 
   out.appendChild(section(t('overview.systemStatus'), null, kpis));
 
+  /* --- farm schematic — the system visualization, given the load-bearing
+     "instrument panel" treatment and placed right after the status strip so
+     the reader sees the physical layout before the abstract control loop. */
+  out.appendChild(section(t('overview.farm'), null, panel(t('overview.farmLayout'), farmSchematic(device))));
+
   /* --- SENSE -> UNDERSTAND -> DECIDE -> ACT -> MONITOR ------------------- */
   out.appendChild(
-    section(t('overview.whatHydraxIsDoing'), t('overview.controlLoopLive'), card(null, pipeline(device))),
+    section(t('overview.whatHydraxIsDoing'), t('overview.controlLoopLive'), panel(null, pipeline(device))),
   );
 
   /* --- control (honest, read-only) + active alerts ----------------------- */
@@ -242,9 +248,6 @@ export function overviewView(state, { onNavigate } = {}) {
     ),
   );
   out.appendChild(section(null, null, controlRow));
-
-  /* --- farm schematic ------------------------------------------------------ */
-  out.appendChild(section(t('overview.farm'), null, card(t('overview.farmLayout'), farmSchematic(device))));
 
   /* --- zones: compact summary cards, full detail lives on the Irrigation
      page — a 3-up grid here mirrors a farm floor plan rather than a data

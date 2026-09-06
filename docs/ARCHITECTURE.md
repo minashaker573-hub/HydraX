@@ -195,8 +195,13 @@ history and dashboard use.
 ## What Phase 1 deliberately excludes
 
 Predictive maintenance and RUL models, pump failure prediction, advanced leak
-localization or a leak-detection robot, the mobile application, multi-farm
-SaaS, payments and subscriptions, and AI-driven dashboards.
+localization or a leak-detection robot, multi-farm SaaS, payments and
+subscriptions, and AI-driven dashboards.
 
 The foundation those need is a controller whose reported state is trustworthy.
 That is what this phase builds.
+
+The mobile app was originally on this list and has since been built —
+read-only, on the same `/api/v1` contract the dashboard uses, and outside the
+control path for the same reasons the dashboard is. It adds no capability the
+backend did not already expose. See [MOBILE.md](MOBILE.md).

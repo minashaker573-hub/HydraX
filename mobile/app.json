@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "HYDRAX",
+    "slug": "hydrax-mobile",
+    "scheme": "hydrax",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A0D0C",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hydrax.mobile"
+    },
+    "android": {
+      "package": "com.hydrax.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0D0C",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-localization"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

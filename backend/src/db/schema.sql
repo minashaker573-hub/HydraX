@@ -157,3 +157,43 @@ CREATE TABLE IF NOT EXISTS quote_request_capabilities (
     capability TEXT NOT NULL,
     PRIMARY KEY (request_id, capability)
 );
+
+-- ---------------------------------------------------------------------------
+-- Public website content management (CMS)
+-- ---------------------------------------------------------------------------
+-- One row per (section, status): exactly two rows per section, 'draft' and
+-- 'published', never more — this is the entire versioning model. Editing a
+-- section writes its 'draft' row; publishing copies that row's `data` into
+-- the 'published' row. The public site only ever reads 'published' rows; the
+-- admin console reads both, so it can show "draft differs from published".
+--
+-- `data` is JSONB, but that does not mean arbitrary shape is accepted: every
+-- write goes through a fixed per-section validator in
+-- backend/src/domain/website-content.ts before it reaches this table. The
+-- column is JSONB rather than one column per field because the *shape* is
+-- owned by that TypeScript module, not by a migration — adding a field to a
+-- section's content is a code change to the validator, not a schema change
+-- here.
+CREATE TABLE IF NOT EXISTS website_content (
+    section      TEXT NOT NULL,
+    status       TEXT NOT NULL CHECK (status IN ('draft', 'published')),
+    data         JSONB NOT NULL,
+    updated_at   TEXT NOT NULL,
+    published_at TEXT,
+    PRIMARY KEY (section, status)
+);
+
+-- Uploaded website images. The file itself lives on disk under
+-- website/assets/uploads/ (served by the same static file route that already
+-- serves the rest of website/assets/ — no new serving code needed); this row
+-- is only the metadata the admin media library and the reference-before-
+-- delete check (routes/media.ts) need.
+CREATE TABLE IF NOT EXISTS website_media (
+    id            BIGSERIAL PRIMARY KEY,
+    filename      TEXT NOT NULL UNIQUE,
+    original_name TEXT NOT NULL,
+    content_type  TEXT NOT NULL,
+    size_bytes    INTEGER NOT NULL,
+    alt_text      TEXT NOT NULL DEFAULT '',
+    uploaded_at   TEXT NOT NULL
+);

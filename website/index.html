@@ -37,7 +37,7 @@
     <link rel="canonical" href="/" />
 
     <link rel="stylesheet" href="/styles.css" />
-    <link rel="icon" href="/assets/logo.jpeg" />
+    <link rel="icon" href="/assets/logo.jpeg" id="site-favicon" />
   </head>
 
   <body>
@@ -47,10 +47,10 @@
     <header class="nav" id="nav">
       <div class="nav-inner">
         <a class="brand" href="#top" aria-label="HYDRAX home">
-          <img class="brand-mark-img" src="/assets/logo.jpeg" alt="" aria-hidden="true" />
+          <img class="brand-mark-img" src="/assets/logo.jpeg" alt="" aria-hidden="true" data-field-src="settings.logo" />
         </a>
 
-        <nav class="nav-links" id="nav-links" aria-label="Sections">
+        <nav class="nav-links" id="nav-links" aria-label="Sections" data-field-list="navigation.items">
           <a href="#problem">Problem</a>
           <a href="#how">How it works</a>
           <a href="#product">Product</a>
@@ -59,8 +59,13 @@
         </nav>
 
         <div class="nav-actions">
-          <a class="btn btn-ghost" href="/dashboard">Live dashboard</a>
-          <a class="btn btn-primary" href="/request">Request a System</a>
+          <a class="btn btn-ghost" href="/dashboard" data-field="navigation.dashboardCtaLabel">Live dashboard</a>
+          <a class="btn btn-primary" href="/request" data-field="navigation.primaryCtaLabel">Request a System</a>
+        </div>
+
+        <div class="lang-toggle" id="lang-toggle" role="group" aria-label="Language">
+          <button class="lang-btn" type="button" data-lang="en">EN</button>
+          <button class="lang-btn" type="button" data-lang="ar">AR</button>
         </div>
 
         <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links">
@@ -75,16 +80,16 @@
       <section class="hero" id="top">
         <div class="container hero-grid">
           <div class="hero-copy" data-reveal="fade-up">
-            <p class="eyebrow">Intelligent irrigation &amp; monitoring</p>
-            <h1>Water that lets every field thrive.</h1>
-            <p class="lede">
+            <p class="eyebrow" data-field="hero.eyebrow">Intelligent irrigation &amp; monitoring</p>
+            <h1 data-field="hero.headline">Water that lets every field thrive.</h1>
+            <p class="lede" data-field="hero.description">
               HYDRAX reads soil moisture zone by zone and lets the controller in the field decide
               when to irrigate — on the spot, without waiting on a server that might not answer.
             </p>
             <div class="hero-actions">
-              <a class="btn btn-primary btn-lg" href="/request">Request a HYDRAX System</a>
+              <a class="btn btn-primary btn-lg" href="/request" data-field="hero.primaryCtaLabel" data-field-href="hero.primaryCtaHref">Request a HYDRAX System</a>
             </div>
-            <ul class="hero-points">
+            <ul class="hero-points" data-field-list="hero.points">
               <li>Keeps irrigating with the internet down</li>
               <li>Per-zone soil thresholds, not a clock</li>
               <li>Pump and valve interlocks enforced in firmware</li>
@@ -96,12 +101,14 @@
               src="/assets/hero-field-canal.jpg"
               alt="Aerial view of cultivated fields divided by an irrigation canal"
               width="2400" height="1801"
+              data-field-src="hero.heroImage"
+              data-field-alt="hero.heroImageAlt"
             />
           </div>
         </div>
       </section>
 
-      <svg class="field-line" viewBox="0 0 1180 28" preserveAspectRatio="none" aria-hidden="true">
+      <svg class="field-line" id="field-line-divider" viewBox="0 0 1180 28" preserveAspectRatio="none" aria-hidden="true">
         <path d="M0 20 C 300 4, 700 32, 1180 10" />
         <path class="is-live" id="field-line-live" d="M0 20 C 300 4, 700 32, 1180 10" />
       </svg>
@@ -110,26 +117,30 @@
       <section class="section" id="problem">
         <div class="container problem-grid">
           <div class="problem-copy" data-reveal="fade-up">
-            <p class="section-label">The field problem</p>
-            <p class="pull">Most irrigation systems know when to run. They don't know why.</p>
-            <p>
-              A fixed schedule cannot see rainfall, a heatwave, a blocked line or a probe that has
-              failed — it applies the same water on the same day regardless of what the ground
-              actually needs. Walking zones to judge moisture by hand is slow and inconsistent
-              between people. And a valve stuck open, or a pump left running, can waste water for
-              hours before anyone notices — usually by seeing the result, not the cause.
-            </p>
-            <p>
-              Many connected controllers make this worse: they send a reading up and wait for an
-              instruction back. On a farm with intermittent connectivity, that means the thing
-              deciding whether crops get water is somewhere else entirely.
-            </p>
+            <p class="section-label" data-field="problem.eyebrow">The field problem</p>
+            <p class="pull" data-field="problem.pullQuote">Most irrigation systems know when to run. They don't know why.</p>
+            <div data-field-list="problem.paragraphs">
+              <p>
+                A fixed schedule cannot see rainfall, a heatwave, a blocked line or a probe that has
+                failed — it applies the same water on the same day regardless of what the ground
+                actually needs. Walking zones to judge moisture by hand is slow and inconsistent
+                between people. And a valve stuck open, or a pump left running, can waste water for
+                hours before anyone notices — usually by seeing the result, not the cause.
+              </p>
+              <p>
+                Many connected controllers make this worse: they send a reading up and wait for an
+                instruction back. On a farm with intermittent connectivity, that means the thing
+                deciding whether crops get water is somewhere else entirely.
+              </p>
+            </div>
           </div>
           <div class="problem-photo" data-reveal="fade-up" data-reveal-delay="100">
             <img
               src="/assets/field-problem-aerial.jpg"
               alt="Aerial view of narrow cultivated plots separated by water channels"
               width="2000" height="1501"
+              data-field-src="problem.image"
+              data-field-alt="problem.imageAlt"
             />
           </div>
         </div>
@@ -139,14 +150,14 @@
       <section class="section section-alt" id="how">
         <div class="container works-grid">
           <div>
-            <p class="section-label">How HYDRAX works</p>
-            <h2>Soil signals, a local decision, water where it's needed.</h2>
-            <p class="section-lede" style="margin-bottom: 0;">
+            <p class="section-label" data-field="how.eyebrow">How HYDRAX works</p>
+            <h2 data-field="how.headline">Soil signals, a local decision, water where it's needed.</h2>
+            <p class="section-lede" style="margin-bottom: 0;" data-field="how.intro">
               Every step below runs on the controller itself. The backend and dashboard only
               observe it — see <a href="#product">the platform</a> for what that looks like.
             </p>
 
-            <ol class="works-flow" data-reveal-group="fade-up" data-reveal-stagger="90">
+            <ol class="works-flow" data-reveal-group="fade-up" data-reveal-stagger="90" data-field-list="how.steps">
               <li class="works-step">
                 <span class="works-step-num">1</span>
                 <div>
@@ -191,10 +202,12 @@
                   src="/assets/water-droplet-leaf.jpg"
                   alt="Close-up of water droplets on a leaf edge"
                   width="1600" height="1200"
+                  data-field-src="how.accentImage"
+                  data-field-alt="how.accentImageAlt"
                 />
               </div>
               <span class="droplet-ripple" id="droplet-ripple" aria-hidden="true"></span>
-              <p class="droplet-accent-caption">The same decision, made the same way, every time a zone reads dry.</p>
+              <p class="droplet-accent-caption" data-field="how.accentCaption">The same decision, made the same way, every time a zone reads dry.</p>
             </div>
           </div>
         </div>
@@ -203,9 +216,9 @@
       <!-- ================================================== 4. product / platform -->
       <section class="section" id="product">
         <div class="container">
-          <p class="section-label">The platform</p>
-          <h2>See what the field sees.</h2>
-          <p class="section-lede">
+          <p class="section-label" data-field="product.eyebrow">The platform</p>
+          <h2 data-field="product.headline">See what the field sees.</h2>
+          <p class="section-lede" data-field="product.lede">
             This is an actual capture of the dashboard shipped with the system, running against
             the simulation fixture on this server — labelled as such, in the interface itself,
             not cropped out for this page.
@@ -217,14 +230,15 @@
               width="1600" height="1000"
               alt="HYDRAX dashboard overview showing system status, soil moisture, the live control loop, and active alerts, with a DEMO / SIMULATION badge because this capture runs on the mock-device fixture"
               loading="lazy"
+              data-field-src="product.dashboardImage"
             />
           </div>
           <p class="platform-caption">
-            <span><strong>Overview page</strong> — system status, soil moisture, control loop, alerts</span>
+            <span><strong data-field="product.captionTitle">Overview page</strong> — <span data-field="product.captionDetail">system status, soil moisture, control loop, alerts</span></span>
             <span>Live at <a href="/dashboard">/dashboard</a></span>
           </p>
 
-          <ul class="platform-list">
+          <ul class="platform-list" data-field-list="product.capabilityItems">
             <li><strong>System status</strong>Device connectivity and last contact</li>
             <li><strong>Soil moisture</strong>Per zone, and the farm average</li>
             <li><strong>Irrigation state</strong>Idle, starting, irrigating, stopped, faulted</li>
@@ -238,14 +252,14 @@
       <!-- ================================================== 5. benefits -->
       <section class="section section-alt" id="benefits">
         <div class="container">
-          <p class="section-label">Benefits</p>
-          <h2>What the system actually does, stated plainly.</h2>
-          <p class="section-lede">
+          <p class="section-label" data-field="benefits.eyebrow">Benefits</p>
+          <h2 data-field="benefits.headline">What the system actually does, stated plainly.</h2>
+          <p class="section-lede" data-field="benefits.lede">
             Every line below is implemented and covered by the firmware's automated test suite —
             a fact about the code, not a projection about a farm.
           </p>
 
-          <div class="benefit-rows" data-reveal-group="fade-up" data-reveal-stagger="70">
+          <div class="benefit-rows" data-reveal-group="fade-up" data-reveal-stagger="70" data-field-list="benefits.items">
             <div class="benefit-row">
               <h3>Local-first</h3>
               <p>
@@ -289,14 +303,19 @@
       <!-- ================================================== 6. built for the field -->
       <section class="section" id="field">
         <div class="container">
-          <p class="section-label">Built for the field</p>
-          <h2>Designed for real conditions, not a demo bench.</h2>
-          <p class="section-lede">
+          <p class="section-label" data-field="field.eyebrow">Built for the field</p>
+          <h2 data-field="field.headline">Designed for real conditions, not a demo bench.</h2>
+          <p class="section-lede" data-field="field.lede">
             The engineering exists to be checked, not taken on faith — including the parts still
             in progress. The controller compiles for its target hardware and is verified against
             50 firmware tests; running on a physical board, and calibrating each probe against
             real soil, is the next step, not a claimed one.
           </p>
+
+          <ul class="status-badges" id="status-badges" data-field-list="field.statusBadges">
+            <li class="status-badge is-software-verified">Control firmware — Software verified</li>
+            <li class="status-badge is-pending-hardware-validation">Physical hardware — Pending hardware validation</li>
+          </ul>
 
           <div class="field-gallery" data-reveal-group="fade-up" data-reveal-stagger="90">
             <div class="field-photo is-tall">
@@ -304,52 +323,56 @@
                 src="/assets/crop-rows-sunset.jpg"
                 alt="Cultivated rows stretching to the horizon at golden hour"
                 width="2000" height="1546"
+                data-field-src="field.gallery.0.image"
+                data-field-alt="field.gallery.0.imageAlt"
               />
-              <p class="field-photo-caption">Cultivated rows, golden hour</p>
+              <p class="field-photo-caption" data-field="field.gallery.0.caption">Cultivated rows, golden hour</p>
             </div>
             <div class="field-photo is-wide">
               <img
                 src="/assets/irrigation-sprinkler.jpg"
                 alt="Center-pivot irrigation rig watering a green crop field"
                 width="2000" height="1126"
+                data-field-src="field.gallery.1.image"
+                data-field-alt="field.gallery.1.imageAlt"
               />
-              <p class="field-photo-caption">Center-pivot irrigation, in operation</p>
+              <p class="field-photo-caption" data-field="field.gallery.1.caption">Center-pivot irrigation, in operation</p>
             </div>
           </div>
 
-          <dl class="verify-strip" id="verify-strip">
+          <dl class="verify-strip" id="verify-strip" data-field-list="field.stats">
             <div class="verify-item"><dt data-count-up="50">0</dt><dd>firmware tests</dd></div>
             <div class="verify-item"><dt data-count-up="1082">0</dt><dd>assertions on the control logic</dd></div>
             <div class="verify-item"><dt data-count-up="129">0</dt><dd>backend tests</dd></div>
             <div class="verify-item"><dt data-count-up="0">0</dt><dd>cloud dependencies in the control path</dd></div>
           </dl>
-          <p class="verify-note">Counts from the automated test suites in the repository — a measurement of the software, not of field performance.</p>
+          <p class="verify-note" data-field="field.statsNote">Counts from the automated test suites in the repository — a measurement of the software, not of field performance.</p>
         </div>
       </section>
 
       <!-- ================================================== 7. final cta -->
       <section class="section section-alt section-final" id="contact">
         <div class="container final-inner">
-          <p class="section-label" style="justify-content: center;">Get in touch</p>
-          <h2>Tell us about your farm.</h2>
-          <p class="lede">
+          <p class="section-label" style="justify-content: center;" data-field="contact.eyebrow">Get in touch</p>
+          <h2 data-field="contact.headline">Tell us about your farm.</h2>
+          <p class="lede" data-field="contact.lede">
             Send your zone count and how you irrigate today, and we will come back with a
             specific configuration and quote. No account, no obligation.
           </p>
-          <a class="btn btn-primary btn-lg" href="/request">Request a HYDRAX System</a>
+          <a class="btn btn-primary btn-lg" href="/request" data-field="contact.ctaLabel" data-field-href="contact.ctaHref">Request a HYDRAX System</a>
 
           <dl class="final-contact">
             <div class="final-contact-item">
               <dt>Email</dt>
-              <dd><a href="mailto:ingeniummteam@email.com">ingeniummteam@email.com</a></dd>
+              <dd><a href="mailto:ingeniummteam@email.com" id="contact-email">ingeniummteam@email.com</a></dd>
             </div>
             <div class="final-contact-item">
               <dt>Phone</dt>
-              <dd><a href="tel:+201279159200">0127 915 9200</a></dd>
+              <dd><a href="tel:+201279159200" id="contact-phone">0127 915 9200</a></dd>
             </div>
             <div class="final-contact-item">
               <dt>Location</dt>
-              <dd>Mansoura</dd>
+              <dd data-field="contact.location">Mansoura</dd>
             </div>
           </dl>
         </div>
@@ -359,14 +382,14 @@
     <footer class="footer">
       <div class="container footer-inner">
         <div class="footer-brand">
-          <img class="brand-mark-img" src="/assets/logo.jpeg" alt="" aria-hidden="true" />
+          <img class="brand-mark-img" src="/assets/logo.jpeg" alt="" aria-hidden="true" data-field-src="settings.logo" />
           <div>
             <p class="footer-brand-name">HYDRAX</p>
-            <p class="footer-tag">Water that lets every field thrive.</p>
+            <p class="footer-tag" data-field="footer.tagline">Water that lets every field thrive.</p>
           </div>
         </div>
 
-        <nav class="footer-links" aria-label="Footer">
+        <nav class="footer-links" aria-label="Footer" data-field-list="footer.links">
           <a href="#problem">Problem</a>
           <a href="#how">How it works</a>
           <a href="#product">Product</a>
@@ -379,12 +402,12 @@
         </nav>
       </div>
       <div class="container footer-legal">
-        <p>
+        <p data-field="footer.legalText">
           Relative soil moisture is measured between a dry-air and a submerged reference per
           probe. It is not volumetric water content, and is not presented as such anywhere in
           this system.
         </p>
-        <p style="margin-top: 8px;">
+        <p style="margin-top: 8px;" data-field="footer.photoCreditsText">
           Photography: Bernd Dittrich, Mostafijur Rahman Nasim, Aaron Burden, Lumin Osity and Dan
           Meyers, via Unsplash — used under the Unsplash License. These images illustrate
           agriculture and irrigation in general; none depict a HYDRAX installation.
@@ -398,14 +421,15 @@
          phones. See js/site.js for the show/hide logic. -->
     <div class="sticky-cta" id="sticky-cta" hidden>
       <div class="sticky-cta-inner">
-        <p class="sticky-cta-text"><strong>Ready to talk to us?</strong> No account, no obligation.</p>
-        <a class="btn btn-primary" href="/request">Request a quote</a>
+        <p class="sticky-cta-text"><strong data-field="settings.stickyCtaText">Ready to talk to us?</strong> No account, no obligation.</p>
+        <a class="btn btn-primary" href="/request" data-field="settings.defaultCtaLabel" data-field-href="settings.defaultCtaHref">Request a quote</a>
         <button class="sticky-cta-dismiss" id="sticky-cta-dismiss" type="button" aria-label="Dismiss">
           &times;
         </button>
       </div>
     </div>
 
+    <script type="module" src="/js/content.js"></script>
     <script type="module" src="/js/site.js"></script>
     <script type="module" src="/js/animations.js"></script>
   </body>

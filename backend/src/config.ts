@@ -5,6 +5,8 @@
  * touches `process.env`.
  */
 
+import { join } from 'node:path';
+
 export interface Config {
   readonly host: string;
   readonly port: number;
@@ -30,6 +32,14 @@ export interface Config {
   readonly websiteDir: string;
   /** Directory served as the operator console, mounted under /admin. */
   readonly adminDir: string;
+  /**
+   * Directory CMS media uploads are written to. Deliberately a subdirectory
+   * of `websiteDir` (website/assets/uploads/) rather than a separate mount:
+   * the existing static file route already serves everything under
+   * websiteDir, so an uploaded image is reachable at /assets/uploads/<file>
+   * with no new serving code, and no new CSP/CORS surface to reason about.
+   */
+  readonly mediaDir: string;
   /** Max public quote submissions per source per window. */
   readonly requestRateMax: number;
   /** Rate limit window for public quote submissions, in ms. */
@@ -115,6 +125,7 @@ export function loadConfig(
     dashboardDir: env.HYDRAX_DASHBOARD_DIR ?? defaults.dashboardDir,
     websiteDir: env.HYDRAX_WEBSITE_DIR ?? defaults.websiteDir,
     adminDir: env.HYDRAX_ADMIN_DIR ?? defaults.adminDir,
+    mediaDir: join(env.HYDRAX_WEBSITE_DIR ?? defaults.websiteDir, 'assets', 'uploads'),
     requestRateMax: intFromEnv(env, 'HYDRAX_REQUEST_RATE_MAX', 10),
     requestRateWindowMs: intFromEnv(env, 'HYDRAX_REQUEST_RATE_WINDOW_MS', 60 * 60 * 1000),
     allowedOrigin: env.HYDRAX_ALLOWED_ORIGIN?.trim() || null,
