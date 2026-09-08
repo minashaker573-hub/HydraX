@@ -6,8 +6,8 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
-    "backgroundColor": "#0A0D0C",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FAF7F0",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.hydrax.mobile"

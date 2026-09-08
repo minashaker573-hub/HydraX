@@ -1,43 +1,62 @@
 /**
  * HYDRAX Mobile — design tokens.
  *
- * The palette is lifted from the dashboard stylesheet (dashboard/styles.css)
- * so the two surfaces read as one product. It is deliberately dark-only: this
- * app is a control-room instrument that gets looked at in a barn at 05:00 and
- * in direct sun at noon, and a light theme that nobody asked for is a second
- * palette to keep honest for no benefit.
+ * BRAND COLOUR SOURCE OF TRUTH: `website/styles.css`'s `:root` block and the
+ * HYDRAX mark (`website/assets/logo.jpeg`) — a warm, editorial identity built
+ * around ivory paper, deep forest-green ink, muted sage, and a clear
+ * water-blue used as the one accent. This file used to run a separate,
+ * dark-only, dashboard-derived palette; it now reuses the website's actual
+ * declared values so the phone app reads as the same product as the site and
+ * the mark, not a second brand. No hue on this page was invented — every
+ * value below is a literal value already used in `website/styles.css`,
+ * repointed at a mobile-shaped set of names.
  *
- * Semantic colour (ok / warn / crit / water) is kept separate from the brand
- * accent so a colour never means two things on one screen. Nothing in the app
- * relies on colour alone — every status also carries a word (see StatusPill).
+ * Two colours had to be chosen between close relatives because the website
+ * itself uses a lighter and a darker shade of the same idea and mobile needs
+ * exactly one:
+ *   - `accent`/`ok` use the website's `--ink` family (its real primary
+ *     interactive colour — active nav link, active language toggle, primary
+ *     button fill) rather than `--sage`, which the site only ever uses at
+ *     decorative size or as white-on-fill, never as small coloured text.
+ *   - `water` uses `--water-deep`, not the lighter `--water`, for the same
+ *     reason: `--water` reads well as a big droplet or a thin flourish line,
+ *     but fails ordinary text-contrast at the sizes this app's status pills
+ *     use it at. `--water-deep` is the shade the website itself reaches for
+ *     whenever water-blue has to double as legible text (links, the
+ *     "required field" marker, hover states).
+ *
+ * Semantic colour (ok / warn / crit / water) is kept distinct from the plain
+ * brand accent so a colour never means two things on one screen. Nothing in
+ * the app relies on colour alone — every status also carries a word (see
+ * StatusPill).
  */
 
 export const colors = {
-  bg: '#0A0D0C',
-  surface: '#121613',
-  surface2: '#1A1F1B',
-  surface3: '#242B25',
-  border: '#232A25',
-  borderStrong: '#333D34',
+  bg: '#FAF7F0', // website --paper
+  surface: '#FFFFFF', // website --surface
+  surface2: '#F1EBDD', // website --paper-2
+  surface3: '#E3DBC9', // website --line, reused as a third depth step
+  border: '#E3DBC9', // website --line
+  borderStrong: '#CDBF9F', // website --line-strong
 
-  ink: '#EEF2EF',
-  ink2: '#C3CCC6',
-  dim: '#8B968F',
+  ink: '#1F3626', // website --ink
+  ink2: '#40564A', // website --ink-2
+  dim: '#7C8577', // website --dim
 
-  accent: '#2FBF6E',
-  accentInk: '#06120A',
-  accentSoft: '#10281A',
+  accent: '#1F3626', // website --ink — the site's real primary interactive colour
+  accentInk: '#FAF7F0', // website --paper — text/icon colour on a solid accent fill
+  accentSoft: '#EEF1E6', // website --sage-soft
 
-  ok: '#34C98F',
-  okSoft: '#10281D',
-  warn: '#E0A84A',
-  warnSoft: '#2F2510',
-  crit: '#F0554A',
-  critSoft: '#33140F',
-  water: '#4DB8F0',
-  waterSoft: '#0E2632',
-  idle: '#8B968F',
-  idleSoft: '#1A1F1B',
+  ok: '#40564A', // website --ink-2 — same brand-green family as accent, one step lighter
+  okSoft: '#EEF1E6', // website --sage-soft
+  warn: '#93692E', // website --warn
+  warnSoft: '#F5ECD9', // website --warn-soft
+  crit: '#9C4433', // website --danger
+  critSoft: '#F6E6E0', // website --danger-soft
+  water: '#276C86', // website --water-deep (text-safe shade of the droplet blue)
+  waterSoft: '#E6F3F6', // website --water-soft
+  idle: '#7C8577', // website --dim
+  idleSoft: '#F1EBDD', // website --paper-2
 } as const;
 
 export type ToneName = 'ok' | 'warn' | 'crit' | 'water' | 'idle' | 'accent';

@@ -1,17 +1,26 @@
 /**
  * HYDRAX Mobile — the icon set.
  *
- * Six stroked paths, drawn with react-native-svg (already a dependency for the
- * chart). No icon font, no icon package: an icon library would ship a thousand
- * glyphs to render five, and these are the same shapes the dashboard sidebar
- * uses, which is what makes the two surfaces feel like one product.
+ * A handful of stroked paths, drawn with react-native-svg (already a
+ * dependency for the chart). No icon font, no icon package: an icon library
+ * would ship a thousand glyphs to render a handful, and these are the same
+ * shapes the dashboard sidebar uses, which is what makes the two surfaces
+ * feel like one product.
  */
 
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { colors } from '../theme/tokens';
 
-export type IconName = 'home' | 'zones' | 'history' | 'alerts' | 'device' | 'droplet' | 'chevron';
+export type IconName =
+  | 'home'
+  | 'zones'
+  | 'history'
+  | 'alerts'
+  | 'device'
+  | 'droplet'
+  | 'chevron'
+  | 'pulse';
 
 export interface IconProps {
   readonly name: IconName;
@@ -33,8 +42,19 @@ export function Icon({ name, size = 22, color = colors.dim }: IconProps): React.
       {name === 'home' ? (
         <Path d="M4 11.5 12 4l8 7.5M6 10v9h5v-5h2v5h5v-9" {...common} />
       ) : null}
-      {name === 'zones' || name === 'droplet' ? (
+      {name === 'droplet' ? (
         <Path d="M12 3s6 6.5 6 10.5a6 6 0 0 1-12 0C6 9.5 12 3 12 3Z" {...common} />
+      ) : null}
+      {/* Four plots on a field, not another droplet — the two used to share a
+          path, which made "Soil overview" and "Zone snapshot" carry the same
+          glyph on Home. */}
+      {name === 'zones' ? (
+        <>
+          <Rect x={3.5} y={3.5} width={7.5} height={7.5} rx={1.5} {...common} />
+          <Rect x={13} y={3.5} width={7.5} height={7.5} rx={1.5} {...common} />
+          <Rect x={3.5} y={13} width={7.5} height={7.5} rx={1.5} {...common} />
+          <Rect x={13} y={13} width={7.5} height={7.5} rx={1.5} {...common} />
+        </>
       ) : null}
       {name === 'history' ? <Path d="M3 17l5-6 4 3 5-7 4 4" {...common} /> : null}
       {name === 'alerts' ? (
@@ -50,6 +70,9 @@ export function Icon({ name, size = 22, color = colors.dim }: IconProps): React.
         </>
       ) : null}
       {name === 'chevron' ? <Path d="M9 5l7 7-7 7" {...common} /> : null}
+      {/* Same zigzag the dashboard uses for "irrigation" — one shared visual
+          vocabulary across both surfaces. */}
+      {name === 'pulse' ? <Path d="M3 12h4l2-7 4 14 2-7h6" {...common} /> : null}
     </Svg>
   );
 }

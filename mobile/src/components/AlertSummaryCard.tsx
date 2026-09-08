@@ -27,14 +27,18 @@ export function AlertSummaryCard({
   const hasCritical = active.some((alert) => alert.severity === 'critical');
   const tone = active.length === 0 ? 'ok' : hasCritical ? 'crit' : 'warn';
   const palette = tonePalette[tone];
+  const countLabel =
+    active.length === 0
+      ? t('alerts.none')
+      : active.length === 1
+        ? t('home.activeAlert')
+        : t('home.activeAlerts', { n: active.length });
 
   return (
     <Pressable
       onPress={() => router.push('/alerts')}
       accessibilityRole="button"
-      accessibilityLabel={
-        active.length === 0 ? t('alerts.none') : t('home.activeAlertsCount', { n: active.length })
-      }
+      accessibilityLabel={countLabel}
       style={({ pressed }) => ({
         opacity: pressed ? 0.85 : 1,
         borderRadius: radius.md,
@@ -60,7 +64,7 @@ export function AlertSummaryCard({
         </View>
         <Stack gap={1} flex={1}>
           <Text variant="bodyStrong" tint={palette.fg}>
-            {active.length === 0 ? t('alerts.none') : t('home.activeAlertsCount', { n: active.length })}
+            {countLabel}
           </Text>
           <Text variant="micro" color="dim">
             {active.length === 0 ? t('home.allClearBody') : t('home.reviewAlerts')}

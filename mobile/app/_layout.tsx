@@ -24,7 +24,9 @@ export default function RootLayout(): React.JSX.Element {
     <SafeAreaProvider>
       <I18nProvider>
         <SystemProvider>
-          <StatusBar style="light" />
+          {/* Dark status-bar content (clock/battery icons) for the app's
+              light, paper-toned background — see src/theme/tokens.ts. */}
+          <StatusBar style="dark" />
           <Stack
             screenOptions={{
               headerShown: false,

@@ -25,7 +25,7 @@ export function IrrigationStatusCard({
   const isRunning = device.pumpOn === true;
 
   return (
-    <Row justify="space-between" gap={space.lg}>
+    <Row justify="space-between" gap={space.lg} wrap>
       <Field
         label={t('home.pump')}
         value={isRunning ? t('home.on') : t('home.off')}
@@ -68,15 +68,15 @@ function Field({
   hint?: string;
 }): React.JSX.Element {
   return (
-    <Stack gap={2} flex={1}>
-      <Text variant="micro" color="dim">
+    <Stack gap={2} style={{ flexGrow: 1, flexBasis: 92, minWidth: 92 }}>
+      <Text variant="micro" color="dim" numberOfLines={1}>
         {label}
       </Text>
-      <Text variant="title" tint={tint} numeric mono>
+      <Text variant="title" tint={tint} numeric mono numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
       {hint === undefined ? null : (
-        <Text variant="micro" color="dim" numeric>
+        <Text variant="micro" color="dim" numeric numberOfLines={1}>
           {hint}
         </Text>
       )}

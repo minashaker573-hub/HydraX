@@ -22,7 +22,10 @@ import { colors, space } from '../theme/tokens';
 import { Row } from './layout';
 import { Text } from './Text';
 
-const ZONE_COLORS = [colors.accent, colors.water, '#C9A227', '#B07FE0'] as const;
+// A 3rd/4th zone line borrows the warn/crit hues purely as a distinguishing
+// colour, the same way `accent`/`water` do for zones 1/2 — categorical, not a
+// status claim. All four are real tokens, not invented chart colours.
+const ZONE_COLORS = [colors.accent, colors.water, colors.warn, colors.crit] as const;
 
 const PAD_LEFT = 30;
 const PAD_RIGHT = 8;

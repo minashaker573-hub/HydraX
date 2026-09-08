@@ -11,6 +11,7 @@ import { Pressable, View, type ViewProps } from 'react-native';
 
 import { useI18n } from '../i18n/I18nProvider';
 import { colors, radius, space } from '../theme/tokens';
+import { Icon, type IconName } from './Icons';
 import { Row } from './layout';
 import { Text } from './Text';
 
@@ -105,17 +106,23 @@ export function SectionHeader({
   title,
   caption,
   trailing,
+  icon,
 }: {
   title: string;
   caption?: string;
   trailing?: React.ReactNode;
+  /** A small leading glyph — purely for faster scanning, never the only cue. */
+  icon?: IconName;
 }): React.JSX.Element {
   return (
     <View style={{ rowGap: 2, marginBottom: space.md, marginTop: space.sm }}>
       <Row justify="space-between" align="center">
-        <Text variant="micro" color="dim" accessibilityRole="header">
-          {title}
-        </Text>
+        <Row gap={space.xs + 2}>
+          {icon === undefined ? null : <Icon name={icon} size={13} color={colors.dim} />}
+          <Text variant="micro" color="dim" accessibilityRole="header">
+            {title}
+          </Text>
+        </Row>
         {trailing}
       </Row>
       {caption === undefined ? null : (

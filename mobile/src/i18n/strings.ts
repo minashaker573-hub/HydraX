@@ -93,7 +93,6 @@ export const STRINGS = {
   'home.noEvents': { en: 'No events reported yet', ar: 'لم تسجل أي أحداث بعد' },
   'home.activeAlerts': { en: '{n} active alerts', ar: '{n} تنبيهات نشطة' },
   'home.activeAlert': { en: '1 active alert', ar: 'تنبيه نشط واحد' },
-  'home.activeAlertsCount': { en: '{n} active alerts', ar: '{n} تنبيهات نشطة' },
   'home.noActiveAlerts': { en: 'No active alerts', ar: 'لا توجد تنبيهات نشطة' },
   'home.allClearBody': { en: 'Nothing needs attention right now', ar: 'لا شيء يحتاج انتباهك الآن' },
   'home.reviewAlerts': { en: 'Tap to review', ar: 'اضغط للمراجعة' },

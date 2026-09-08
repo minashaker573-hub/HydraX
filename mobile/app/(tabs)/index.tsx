@@ -39,7 +39,7 @@ import { Text } from '../../src/components/Text';
 import { ZoneChip } from '../../src/components/ZoneChip';
 import { useI18n } from '../../src/i18n/I18nProvider';
 import { useSystem } from '../../src/state/SystemProvider';
-import { space } from '../../src/theme/tokens';
+import { colors, space } from '../../src/theme/tokens';
 import { greetingKey, overallMoisture } from '../../src/utils/format';
 import { staggerDelay } from '../../src/utils/motion';
 
@@ -79,11 +79,17 @@ export default function HomeScreen(): React.JSX.Element {
             <SystemStatusBar online={device.online} simulated={device.simulated} />
           </FadeIn>
 
-          {/* ------------------------------------------- primary soil overview */}
+          {/* ------------------------------------------- primary soil overview
+              The one section on Home allowed to visually lead, per the
+              brief's "most important metric should dominate" — done with a
+              thin accent top edge and extra breathing room rather than a
+              lighter fill, which would fight the gauge's own track contrast
+              (`raised` was tried and made the empty part of the dial harder
+              to read against the card). */}
           <FadeIn delay={staggerDelay(1)}>
             <Stack gap={0}>
-              <SectionHeader title={t('home.soilOverview')} />
-              <Card>
+              <SectionHeader title={t('home.soilOverview')} icon="droplet" />
+              <Card style={{ borderTopColor: colors.accent, borderTopWidth: 2, paddingTop: space.xl }}>
                 <MoistureOverview average={farmMoisture} zones={zones} />
               </Card>
             </Stack>
@@ -92,7 +98,7 @@ export default function HomeScreen(): React.JSX.Element {
           {/* ---------------------------------------------- irrigation status */}
           <FadeIn delay={staggerDelay(2)}>
             <Stack gap={0}>
-              <SectionHeader title={t('home.irrigationStatus')} />
+              <SectionHeader title={t('home.irrigationStatus')} icon="pulse" />
               <Card>
                 <IrrigationStatusCard device={device} />
               </Card>
@@ -104,6 +110,7 @@ export default function HomeScreen(): React.JSX.Element {
             <Stack gap={0}>
               <SectionHeader
                 title={t('home.zoneSnapshot')}
+                icon="zones"
                 trailing={
                   zones.length === 0 ? null : (
                     <Text
@@ -143,6 +150,7 @@ export default function HomeScreen(): React.JSX.Element {
             <Stack gap={0}>
               <SectionHeader
                 title={t('home.recentActivity')}
+                icon="history"
                 trailing={
                   events.length === 0 ? null : (
                     <Text
