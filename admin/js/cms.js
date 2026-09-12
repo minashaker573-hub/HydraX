@@ -56,7 +56,14 @@ async function api(path, options = {}) {
       /* body wasn't JSON (or was empty) — fall through to the generic message */
     }
     const error = new Error((detail && detail.error) || `HTTP ${response.status}`);
-    error.errors = detail && Array.isArray(detail.errors) ? detail.errors : undefined;
+    // The API's per-field messages arrive under `details` — that is what
+    // http/respond.ts's sendError() emits. This read said `detail.errors`,
+    // which is never present, so every validation failure collapsed to the
+    // bare "invalid content" line and an admin was told something was wrong
+    // but not which field. `errors` is kept as a fallback so this keeps
+    // working if an endpoint ever uses that name instead.
+    const messages = detail && (detail.details ?? detail.errors);
+    error.errors = Array.isArray(messages) ? messages : undefined;
     throw error;
   }
   return response.json();
@@ -167,6 +174,35 @@ const STATUS_LABELS = {
 
 const REORDERABLE_IDS = ['problem', 'how', 'product', 'benefits', 'field'];
 
+// Mirrors SOCIAL_PLATFORMS in domain/website-content.ts. `domain` is shown as
+// a hint and used for the "not configured" messaging below; the server
+// re-validates every URL against its own copy regardless, so this list is
+// convenience, never the security boundary.
+//
+// Every entry starts unconfigured on purpose. HYDRAX has no account on any of
+// these, and this editor never prefills a URL - an admin pastes a real one or
+// the row stays off the public page. There is specifically no HYDRAX LinkedIn.
+const SOCIAL_PLATFORMS = [
+  { key: 'linkedin', name: 'LinkedIn', domain: 'linkedin.com' },
+  { key: 'instagram', name: 'Instagram', domain: 'instagram.com' },
+  { key: 'facebook', name: 'Facebook', domain: 'facebook.com' },
+  { key: 'youtube', name: 'YouTube', domain: 'youtube.com' },
+  { key: 'tiktok', name: 'TikTok', domain: 'tiktok.com' },
+  { key: 'x', name: 'X', domain: 'x.com' },
+];
+
+// The destinations /links itself may link to. Deliberately NOT HREF_OPTIONS:
+// that list includes the homepage's in-page anchors, which do not exist on
+// /links - offering one would save cleanly and then scroll nowhere. Mirrors
+// validateLinkHubHref in domain/website-content.ts.
+const LINKHUB_HREF_OPTIONS = [
+  { value: '/', label: 'HYDRAX home page (/)' },
+  { value: '/request', label: 'Request a system (/request)' },
+  { value: '/dashboard', label: 'Live dashboard (/dashboard)' },
+  { value: '/privacy', label: 'Privacy policy (/privacy)' },
+  { value: '/terms', label: 'Terms (/terms)' },
+];
+
 const SECTION_LABELS = {
   hero: 'Hero',
   navigation: 'Navigation',
@@ -180,6 +216,7 @@ const SECTION_LABELS = {
   seo: 'SEO',
   sections: 'Homepage section order',
   settings: 'Site settings',
+  linkHub: 'Link Hub (/links)',
 };
 
 // The left-hand nav's order. 'media' and 'publishing' aren't website-content
@@ -196,6 +233,7 @@ const NAV_ITEMS = [
   { id: 'field', label: 'Built for the field' },
   { id: 'contact', label: 'Final CTA / contact' },
   { id: 'footer', label: 'Footer' },
+  { id: 'linkHub', label: 'Link Hub' },
   { id: 'seo', label: 'SEO' },
   { id: 'settings', label: 'Site settings' },
   { id: 'media', label: 'Media library' },
@@ -343,6 +381,70 @@ const SECTION_SCHEMA = {
     { key: 'defaultCtaHref', label: 'Default CTA link', kind: 'href' },
     { key: 'stickyCtaText', label: 'Mobile sticky-bar headline', kind: 'localized', maxLen: 160 },
   ],
+  // The /links link hub. Grouped to match the page top to bottom: identity,
+  // the one primary CTA, then each category of rows. Bounds transcribed from
+  // validateLinkHub in domain/website-content.ts.
+  linkHub: [
+    { key: 'eyebrow', label: 'Eyebrow', kind: 'localized', maxLen: 60, group: 'General' },
+    { key: 'tagline', label: 'Tagline', kind: 'localized', maxLen: 100, group: 'General' },
+    { key: 'intro', label: 'Intro line', kind: 'localized', maxLen: 200, textarea: true, group: 'General' },
+    { key: 'location', label: 'Location', kind: 'localized', maxLen: 80, group: 'General' },
+
+    { key: 'primaryLabel', label: 'Button label', kind: 'localized', maxLen: 60, group: 'Primary CTA' },
+    {
+      key: 'primaryHref', label: 'Button link', kind: 'href',
+      options: LINKHUB_HREF_OPTIONS, group: 'Primary CTA',
+    },
+    {
+      key: 'primaryNote', label: 'Supporting line under the button', kind: 'localized',
+      maxLen: 140, textarea: true, group: 'Primary CTA',
+    },
+
+    { key: 'exploreHeading', label: 'Section heading', kind: 'localized', maxLen: 40, group: 'Explore' },
+    {
+      key: 'exploreItems', label: 'Explore links', kind: 'objectList', min: 0, max: 8,
+      itemLabel: 'link', group: 'Explore',
+      itemFields: [
+        { key: 'id', label: 'ID', kind: 'id' },
+        { key: 'label', label: 'Label', kind: 'localized', maxLen: 60 },
+        { key: 'note', label: 'Supporting line', kind: 'localized', maxLen: 140 },
+        { key: 'href', label: 'Link', kind: 'href', options: LINKHUB_HREF_OPTIONS },
+        { key: 'visible', label: 'Shown on page', kind: 'boolean' },
+      ],
+    },
+
+    { key: 'contactHeading', label: 'Section heading', kind: 'localized', maxLen: 40, group: 'Contact' },
+    {
+      key: 'contactItems', label: 'Contact rows', kind: 'objectList', min: 0, max: 4,
+      itemLabel: 'contact row', group: 'Contact',
+      itemFields: [
+        { key: 'id', label: 'ID', kind: 'id' },
+        { key: 'label', label: 'Label', kind: 'localized', maxLen: 60 },
+        {
+          key: 'href', label: 'Link', kind: 'text', maxLen: 200,
+          hint: 'Must be mailto:someone@example.com or tel:+20... - nothing else is accepted.',
+        },
+        {
+          key: 'display', label: 'Shown value', kind: 'text', maxLen: 120,
+          hint: 'What a visitor reads, e.g. the number in local-dial form. Always rendered left-to-right, including in Arabic.',
+        },
+        { key: 'visible', label: 'Shown on page', kind: 'boolean' },
+      ],
+    },
+
+    { key: 'socialHeading', label: 'Section heading', kind: 'localized', maxLen: 40, group: 'Social accounts' },
+    { key: 'social', label: 'Social accounts', kind: 'socialList', group: 'Social accounts' },
+
+    {
+      key: 'footerLinks', label: 'Footer links', kind: 'objectList', min: 1, max: 8,
+      itemLabel: 'footer link', group: 'Footer',
+      itemFields: [
+        { key: 'label', label: 'Label', kind: 'localized', maxLen: 40 },
+        { key: 'href', label: 'Link', kind: 'href' },
+        { key: 'visible', label: 'Shown on page', kind: 'boolean' },
+      ],
+    },
+  ],
   seo: [
     { key: 'siteTitle', label: 'Site title', kind: 'localized', maxLen: 70 },
     { key: 'metaDescription', label: 'Meta description', kind: 'localized', maxLen: 160, textarea: true },
@@ -354,7 +456,7 @@ const SECTION_SCHEMA = {
 
 const ALL_CONTENT_IDS = [
   'hero', 'navigation', 'problem', 'how', 'product', 'benefits', 'field', 'contact', 'footer', 'seo', 'sections',
-  'settings',
+  'settings', 'linkHub',
 ];
 
 /* ============================================================ state ===== */
@@ -589,10 +691,34 @@ function buildImagePicker(obj, desc) {
   return box;
 }
 
+/**
+ * A machine handle for a new row, so reordering can never swap two rows'
+ * identities. Matches the server's ID_RE (lowercase, digits, hyphens) and is
+ * random rather than derived from the label, because a label is editable and
+ * an id must not change under the row when it is. Never shown to a visitor.
+ */
+function newItemId() {
+  const rand = (globalThis.crypto && typeof globalThis.crypto.getRandomValues === 'function')
+    ? Array.from(globalThis.crypto.getRandomValues(new Uint8Array(4),), (b) => b.toString(16).padStart(2, '0')).join('')
+    : Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
+  return `row-${rand}`;
+}
+
+/** One row per supported platform, all unconfigured. Never a prefilled URL. */
+function blankSocialList() {
+  return SOCIAL_PLATFORMS.map((platform) => ({
+    platform: platform.key,
+    label: { en: platform.name, ar: '' },
+    url: '',
+    visible: true,
+  }));
+}
+
 function blankFor(desc) {
   switch (desc.kind) {
     case 'localized': return { en: '', ar: '' };
-    case 'href': return HREF_OPTIONS[0].value;
+    case 'id': return newItemId();
+    case 'href': return (desc.options ?? HREF_OPTIONS)[0].value;
     case 'image': return desc.optional ? '' : SEED_IMAGES[0].value;
     case 'number': return desc.min ?? 0;
     case 'boolean': return true;
@@ -611,7 +737,9 @@ function blankSection(id) {
   const fields = SECTION_SCHEMA[id] || [];
   const obj = {};
   for (const field of fields) {
-    if (field.kind === 'localizedList') {
+    if (field.kind === 'socialList') {
+      obj[field.key] = blankSocialList();
+    } else if (field.kind === 'localizedList') {
       obj[field.key] = Array.from({ length: field.min ?? 1 }, () => ({ en: '', ar: '' }));
     } else if (field.kind === 'objectList') {
       const length = field.fixed ? field.max : Math.max(field.min ?? 1, 1);
@@ -634,8 +762,29 @@ function buildField(obj, desc) {
       }));
       break;
     case 'href':
-      wrap.appendChild(buildSelect(HREF_OPTIONS, obj[desc.key], (value) => { obj[desc.key] = value; }));
+      // `desc.options` lets one section offer a narrower destination list than
+      // the site-wide one — /links has no in-page anchors to offer. Absent, it
+      // behaves exactly as before.
+      wrap.appendChild(buildSelect(
+        desc.options ?? HREF_OPTIONS, obj[desc.key], (value) => { obj[desc.key] = value; },
+      ));
       break;
+    case 'id': {
+      // Read-only rather than disabled: a disabled input is skipped by
+      // keyboard navigation and by screen readers, and this is information
+      // worth reaching even though it is not worth editing.
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.readOnly = true;
+      input.className = 'input-readonly';
+      if (!obj[desc.key]) obj[desc.key] = newItemId();
+      input.value = obj[desc.key];
+      wrap.appendChild(input);
+      wrap.appendChild(el('span', 'field-hint', 'Assigned automatically; kept stable when rows are reordered.'));
+      break;
+    }
+    case 'socialList':
+      return buildSocialList(obj, desc);
     case 'image':
       wrap.appendChild(buildImagePicker(obj, desc));
       break;
@@ -683,6 +832,105 @@ function buildField(obj, desc) {
     default:
       break;
   }
+  if (desc.hint) wrap.appendChild(el('span', 'field-hint', desc.hint));
+  return wrap;
+}
+
+/**
+ * The social-accounts editor: one fixed row per supported platform.
+ *
+ * Deliberately not an objectList. The six platforms are not a list an admin
+ * grows - adding a seventh needs an icon drawn and a domain allowlisted, so
+ * it is a code change. What an admin does here is answer "does this account
+ * exist yet", which is why every row is always present and the only states
+ * are "not configured" and a real URL.
+ *
+ * Nothing here is ever prefilled with a guessed URL, and an empty URL renders
+ * no row on /links at all - so the page never shows a link to an account that
+ * does not exist.
+ */
+function buildSocialList(obj, desc) {
+  const wrap = el('div', 'field field-array');
+  wrap.appendChild(el('label', 'field-label', desc.label));
+
+  // Repair a row set that predates this editor (or a platform added since),
+  // without discarding any URL an admin already saved.
+  const existing = Array.isArray(obj[desc.key]) ? obj[desc.key] : [];
+  obj[desc.key] = SOCIAL_PLATFORMS.map((platform) => {
+    const found = existing.find((row) => row && row.platform === platform.key);
+    return {
+      platform: platform.key,
+      label: (found && found.label) || { en: platform.name, ar: '' },
+      url: (found && typeof found.url === 'string') ? found.url : '',
+      visible: found ? found.visible !== false : true,
+    };
+  });
+
+  const itemsBox = el('div', 'array-items');
+
+  for (const platform of SOCIAL_PLATFORMS) {
+    const item = obj[desc.key].find((row) => row.platform === platform.key);
+    const card = el('div', 'array-item');
+    const body = el('div', 'array-item-body');
+
+    const head = el('div', 'social-row-head');
+    head.appendChild(el('strong', 'social-row-name', platform.name));
+    const state = el('span', 'cms-status-pill', '');
+    head.appendChild(state);
+    body.appendChild(head);
+
+    const syncState = () => {
+      const configured = item.url.trim() !== '';
+      state.textContent = configured
+        ? (item.visible ? 'Live when published' : 'Configured, hidden')
+        : 'Not configured';
+      state.className = `cms-status-pill ${configured && item.visible ? 'is-clean' : 'is-pending'}`;
+    };
+
+    body.appendChild(buildField(item, { key: 'label', label: 'Label', kind: 'localized', maxLen: 40 }));
+
+    const urlField = el('div', 'field field-text');
+    urlField.appendChild(el('label', 'field-label', 'Profile URL'));
+    const input = document.createElement('input');
+    input.type = 'url';
+    input.value = item.url;
+    input.maxLength = 300;
+    input.placeholder = `https://${platform.domain}/...`;
+    input.addEventListener('input', () => {
+      item.url = input.value.trim();
+      syncState();
+    });
+    urlField.appendChild(input);
+    urlField.appendChild(el(
+      'span', 'field-hint',
+      `Leave empty if there is no ${platform.name} account - the row is then not shown on /links at all. `
+        + `A URL must be https and on ${platform.domain}; anything else is refused when you save.`,
+    ));
+    body.appendChild(urlField);
+
+    const toggle = el('label', 'boolean-field');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = item.visible !== false;
+    checkbox.addEventListener('change', () => {
+      item.visible = checkbox.checked;
+      syncState();
+    });
+    toggle.appendChild(checkbox);
+    toggle.appendChild(document.createTextNode('Shown on page'));
+    body.appendChild(toggle);
+
+    syncState();
+    card.appendChild(body);
+    itemsBox.appendChild(card);
+  }
+
+  wrap.appendChild(itemsBox);
+  wrap.appendChild(el(
+    'span', 'field-hint',
+    'All six supported platforms are always listed. If none has a URL, the whole "Follow" section '
+      + 'is left off the public page rather than shown empty.',
+  ));
   return wrap;
 }
 
@@ -842,7 +1090,17 @@ async function renderContentEditor(id) {
   currentMessageBox = messageBox;
 
   const form = el('div', 'cms-form');
-  for (const desc of SECTION_SCHEMA[id] || []) form.appendChild(buildField(workingDraft, desc));
+  // `group` is optional: a section that sets it on its fields gets subheadings
+  // (the link hub has five distinct categories and reads badly as one flat
+  // column); every existing section sets none and renders exactly as before.
+  let currentGroup = null;
+  for (const desc of SECTION_SCHEMA[id] || []) {
+    if (desc.group && desc.group !== currentGroup) {
+      currentGroup = desc.group;
+      form.appendChild(el('h3', 'cms-subheading', desc.group));
+    }
+    form.appendChild(buildField(workingDraft, desc));
+  }
   editorEl.appendChild(form);
 
   const actions = el('div', 'cms-actions');
@@ -1122,6 +1380,12 @@ async function renderMediaPanel() {
 
 /* ============================================================ preview === */
 
+// Which public page each section is previewed against. Anything not listed
+// lives on the homepage.
+const PREVIEW_TARGETS = {
+  linkHub: '/links',
+};
+
 if (previewOpenBtn) previewOpenBtn.addEventListener('click', () => void openPreview());
 if (previewCloseBtn) previewCloseBtn.addEventListener('click', () => { previewOverlay.hidden = true; });
 
@@ -1141,17 +1405,25 @@ async function openPreview() {
   // "Preview" should always show what is actually on screen right now.
   if (workingSection && workingDraft) sections[workingSection] = workingDraft;
 
+  // Preview the page the open section actually appears on. The link hub is
+  // its own page, so previewing it against '/' would show the homepage and
+  // silently none of the edits just made.
+  const target = PREVIEW_TARGETS[workingSection] ?? '/';
+
   previewOverlay.hidden = false;
   const send = () => {
     previewFrame.contentWindow.postMessage({ type: 'hydrax:preview-content', sections }, window.location.origin);
   };
-  if (previewFrame.dataset.loaded === 'true') {
+  // `loaded` is keyed on the URL, not a bare boolean: switching from the
+  // homepage to /links has to wait for the new document's own load before
+  // posting, or the draft is delivered to the page being navigated away from.
+  if (previewFrame.dataset.loaded === target) {
     send();
   } else {
     previewFrame.addEventListener('load', () => {
-      previewFrame.dataset.loaded = 'true';
+      previewFrame.dataset.loaded = target;
       send();
     }, { once: true });
-    previewFrame.src = '/';
+    previewFrame.src = target;
   }
 }

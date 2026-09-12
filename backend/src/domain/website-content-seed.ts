@@ -22,6 +22,7 @@
 import type {
   BenefitsContent,
   ContactContent,
+  LinkHubContent,
   FieldContent,
   FooterContent,
   HeroContent,
@@ -325,6 +326,91 @@ const settings: SiteSettingsContent = {
   stickyCtaText: en('Ready to talk to us?'),
 };
 
+/* ------------------------------------------------------------------ linkHub */
+
+/**
+ * The /links link hub, transcribed verbatim from website/js/links-config.js
+ * — the file that was the hub's authoring surface before the CMS took that
+ * role over. Same rule as the rest of this file: nothing invented, so
+ * turning the CMS on does not change what a visitor already sees.
+ *
+ * `backend/test/website-content.test.ts` asserts this stays equal to that
+ * config module, the same way it already asserts the hero headline still
+ * matches index.html. links-config.js in turn is checked against
+ * links.html's no-JS markup by website/check.mjs, so the three surfaces
+ * cannot drift apart silently.
+ *
+ * Every social url is '' — not a placeholder to fill in, a statement that
+ * the account does not exist. An empty url renders no row (see
+ * website/js/links.js), so publishing this seed adds no social section at
+ * all, and specifically no HYDRAX LinkedIn, which does not exist.
+ */
+const linkHub: LinkHubContent = {
+  eyebrow: en('Official links'),
+  tagline: en('Water that lets every field thrive.'),
+  intro: en('Soil-based irrigation control that runs on the farm, not in the cloud.'),
+
+  primaryLabel: en('Visit the HYDRAX website'),
+  primaryNote: en('What the system is, how it works, and what it deliberately does not do'),
+  primaryHref: '/',
+
+  exploreHeading: en('Explore'),
+  exploreItems: [
+    {
+      id: 'request',
+      label: en('Request a HYDRAX System'),
+      note: en('Tell us about your farm — no account, no payment, no obligation'),
+      href: '/request',
+      visible: true,
+    },
+    {
+      id: 'dashboard',
+      label: en('Live monitoring dashboard'),
+      note: en('Soil moisture, irrigation state, pump health, alerts'),
+      href: '/dashboard',
+      visible: true,
+    },
+  ],
+
+  socialHeading: en('Follow'),
+  social: [
+    { platform: 'linkedin', label: en('Team LinkedIn'), url: '', visible: true },
+    { platform: 'instagram', label: en('Instagram'), url: '', visible: true },
+    { platform: 'facebook', label: en('Facebook'), url: '', visible: true },
+    { platform: 'youtube', label: en('YouTube'), url: '', visible: true },
+    { platform: 'tiktok', label: en('TikTok'), url: '', visible: true },
+    { platform: 'x', label: en('X'), url: '', visible: true },
+  ],
+
+  contactHeading: en('Contact'),
+  contactItems: [
+    {
+      id: 'email',
+      label: en('Email us'),
+      note: en(''),
+      href: 'mailto:ingeniummteam@email.com',
+      display: 'ingeniummteam@email.com',
+      visible: true,
+    },
+    {
+      id: 'phone',
+      label: en('Call us'),
+      note: en(''),
+      href: 'tel:+201279159200',
+      display: '0127 915 9200',
+      visible: true,
+    },
+  ],
+  location: en('Mansoura, Egypt'),
+
+  footerLinks: [
+    { label: en('Home'), href: '/', visible: true },
+    { label: en('Request a System'), href: '/request', visible: true },
+    { label: en('Privacy'), href: '/privacy', visible: true },
+    { label: en('Terms'), href: '/terms', visible: true },
+  ],
+};
+
 // Deliberately not annotated as `Record<SectionId, unknown>`: that would
 // widen every field back to `unknown` and make this object useless to read
 // from directly (as the test suite does, to assert the seed matches the
@@ -344,4 +430,5 @@ export const DEFAULT_WEBSITE_CONTENT = {
   sections,
   seo,
   settings,
+  linkHub,
 } satisfies Record<SectionId, unknown>;

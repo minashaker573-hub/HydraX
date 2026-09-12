@@ -1,0 +1,376 @@
+/* ===========================================================================
+   HYDRAX — link hub (/links)
+   ---------------------------------------------------------------------------
+   Additive only. This file loads AFTER styles.css and defines nothing that
+   exists there: every color, font, radius, shadow and focus ring below is a
+   token or a class the site already ships, so nothing here can change how
+   any other page looks. Deleting this file would break only /links.
+
+   The design deliberately avoids the link-in-bio house style — stacked
+   rounded cards, gradients, glass, glow. HYDRAX's identity is editorial and
+   printed: ivory paper, a Georgia headline, mono eyebrows, hairline rules,
+   near-square corners. So the hub reads as an index page from that same
+   printed system — a masthead, a rule, and rows separated by 1px lines —
+   with exactly one filled pill for the primary action.
+   =========================================================================== */
+
+.linkhub-body {
+  /* The hub is short; without this the footer floats mid-viewport on tall
+     phones and on desktop. */
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The paper tone shifts one step at the top and settles into the page —
+   a static, single-hue wash, not a decorative gradient. */
+.linkhub {
+  flex: 1 0 auto;
+  padding: 8px 20px clamp(56px, 9vw, 88px);
+  background: linear-gradient(180deg, var(--paper-2) 0%, var(--paper) 320px);
+}
+
+.linkhub-inner {
+  width: 100%;
+  /* Reads as a single column on a phone and stays a single column on a
+     desktop monitor — a bio link is a column, not a layout. */
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* ------------------------------------------------------------------ topbar */
+
+.linkhub-topbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 20px 0;
+}
+
+/* ---------------------------------------------------------------- identity */
+
+.linkhub-head {
+  text-align: center;
+  padding: clamp(20px, 5vw, 34px) 0 clamp(18px, 4vw, 26px);
+}
+
+/* The supplied mark, unmodified and never redrawn — same rule the nav
+   follows. A hairline ring keeps it from floating on the paper tone. */
+.linkhub-mark {
+  width: clamp(84px, 22vw, 104px);
+  height: clamp(84px, 22vw, 104px);
+  object-fit: contain;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.linkhub-wordmark {
+  font-family: var(--font-sans);
+  font-size: clamp(21px, 5.4vw, 24px);
+  font-weight: 650;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 16px 0 0;
+  line-height: 1.2;
+}
+
+/* styles.css draws the eyebrow's leading rule with flex + ::before. Centering
+   it means centering the pair, not overriding the rule away. */
+.linkhub-eyebrow {
+  justify-content: center;
+  margin: 10px 0 0;
+}
+
+.linkhub-tagline {
+  font-family: var(--font-serif);
+  font-size: clamp(24px, 6.4vw, 30px);
+  line-height: 1.25;
+  color: var(--ink);
+  text-wrap: balance;
+  margin: 12px 0 0;
+}
+
+.linkhub-sub {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  max-width: 34ch;
+  margin: 12px auto 0;
+  text-wrap: pretty;
+}
+
+.linkhub-divider {
+  height: 20px;
+  opacity: 0.85;
+  margin-bottom: clamp(24px, 5vw, 32px);
+}
+
+/* ------------------------------------------------------------- primary CTA */
+
+/* The one filled control on the page. Full width so it is unmistakably the
+   primary action and an easy thumb target, but still the site's pill button
+   — .btn/.btn-primary/.btn-lg do all the real styling. */
+.linkhub-cta {
+  display: flex;
+  width: 100%;
+  min-height: 56px;
+  font-size: 16px;
+}
+
+.linkhub-cta-note {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  text-align: center;
+  margin: 12px auto 0;
+  max-width: 36ch;
+  text-wrap: pretty;
+}
+
+/* ---------------------------------------------------------------- sections */
+
+.linkhub-section { margin-top: clamp(30px, 6vw, 40px); }
+
+.linkhub-section-h {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 0 0 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* -------------------------------------------------------------------- rows */
+
+.linkhub-list { display: block; }
+
+/* Hairline-separated rows, not cards: one shared rule between neighbours,
+   near-square corners from the site's --radius, no shadow at rest. */
+.linkhub-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  /* 64px clears the 44px minimum tap target with room to spare, which is the
+     size that actually matters here — most visitors arrive by thumb. */
+  min-height: 64px;
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  text-decoration: none;
+  background: transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.linkhub-row:last-child { border-bottom: none; }
+
+.linkhub-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--water-deep);
+  background: var(--surface);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.linkhub-icon { width: 18px; height: 18px; display: block; }
+
+.linkhub-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0; /* lets long values wrap instead of forcing the row wider */
+  flex: 1 1 auto;
+}
+
+.linkhub-row-label {
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.linkhub-row-note {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+/* A real address or number: mono, so it reads as data rather than prose, and
+   breakable so a long address cannot widen the page.
+
+   `direction: ltr` + `unicode-bidi: isolate` is not cosmetic here. A phone
+   number is an LTR sequence; dropped into the RTL paragraph the AR toggle
+   creates, its space-separated runs get reordered and "0127 915 9200"
+   displays as "9200 915 0127" — a different, wrong number. Isolating the
+   value pins the digits in the order they were written, in both directions.
+   Alignment is then set per page direction so the value still sits under its
+   label instead of drifting to the opposite edge. */
+.linkhub-row-value {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
+}
+[dir="rtl"] .linkhub-row-value { text-align: right; }
+
+.linkhub-row-arrow {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--line-strong);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+/* Mirrors for Arabic, where the reading direction — and so the direction the
+   arrow should point — reverses. */
+[dir="rtl"] .linkhub-row-arrow { transform: scaleX(-1); }
+
+/* ------------------------------------------------------- interaction states */
+
+.linkhub-row:hover {
+  background: var(--sage-soft);
+  border-bottom-color: var(--line-strong);
+}
+.linkhub-row:hover .linkhub-row-arrow {
+  color: var(--water-deep);
+  transform: translateX(3px);
+}
+[dir="rtl"] .linkhub-row:hover .linkhub-row-arrow { transform: scaleX(-1) translateX(3px); }
+
+.linkhub-row:hover .linkhub-row-icon {
+  border-color: var(--water);
+  background: var(--water-soft);
+}
+
+.linkhub-row:active { transform: translateY(1px); }
+
+/* styles.css already draws the site-wide focus ring (2px --water, 3px
+   offset). All this adds is a background, so a keyboard user sees the row
+   itself respond and not only its outline. */
+.linkhub-row:focus-visible { background: var(--sage-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  .linkhub-row,
+  .linkhub-row-arrow,
+  .linkhub-row-icon { transition: none; }
+  .linkhub-row:hover .linkhub-row-arrow { transform: none; }
+  [dir="rtl"] .linkhub-row:hover .linkhub-row-arrow { transform: scaleX(-1); }
+  .linkhub-row:active { transform: none; }
+}
+
+/* Coarse pointers have no hover; without this the row keeps the hover tint
+   after a tap on iOS and Android, which reads as a stuck selection. */
+@media (hover: none) {
+  .linkhub-row:hover {
+    background: transparent;
+    border-bottom-color: var(--line);
+  }
+  .linkhub-row:hover .linkhub-row-arrow { color: var(--line-strong); transform: none; }
+  .linkhub-row:hover .linkhub-row-icon {
+    border-color: var(--line);
+    background: var(--surface);
+  }
+}
+
+/* ---------------------------------------------------------------- location */
+
+.linkhub-location {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  text-align: center;
+  margin: 20px 0 0;
+}
+
+/* ------------------------------------------------------------------ footer */
+
+.linkhub-footer { flex: none; background: var(--paper); }
+.linkhub-footer .footer-inner { padding-bottom: 0; }
+
+/* On a phone the two footer halves sit stacked and centred rather than
+   pushed to opposite edges of a 375px line. */
+@media (max-width: 560px) {
+  .linkhub-footer .footer-inner {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 20px;
+  }
+  .linkhub-footer .footer-links { justify-content: center; }
+  .linkhub-footer .footer-tag { max-width: 30ch; }
+}
+
+/* Narrow phones (≤360px): buy back horizontal room before anything can
+   overflow. The rows stay above the 44px tap minimum. */
+@media (max-width: 360px) {
+  .linkhub { padding-inline: 14px; }
+  .linkhub-row { padding-inline: 6px; gap: 11px; }
+  .linkhub-row-icon { width: 34px; height: 34px; }
+}
+
+/* ------------------------------------------------ contrast & focus repairs */
+
+/* --dim measures 3.58:1 on --paper. That is fine for the decorative role it
+   plays elsewhere on the site, but every muted string on this page carries
+   real information — what a link leads to, where the company is — so they
+   all use --ink-2 (7.41:1) instead and take their hierarchy from size,
+   weight and case rather than from being washed out. Verified against the
+   computed styles, not estimated.
+
+   .footer-tag is a shared component, so it is corrected only inside this
+   page's footer; styles.css is not touched and no other page changes. */
+.linkhub-footer .footer-tag { color: var(--ink-2); }
+
+/* The site-wide focus ring is 2px of --water, which measures 2.89:1 against
+   the paper — just under the 3:1 a focus indicator needs. --water-deep is
+   the same family at 5.51:1, so the ring stays on-brand and becomes
+   unambiguous. Scoped to this page's controls; the global rule stands. */
+.linkhub-row:focus-visible,
+.linkhub-cta:focus-visible,
+.linkhub-footer a:focus-visible,
+.linkhub-topbar .lang-btn:focus-visible,
+.linkhub-body > .skip-link:focus-visible { outline-color: var(--water-deep); }
+
+/* ---------------------------------------------------- tap targets (/links) */
+
+/* .lang-btn and .footer-links a are shared components sized for desktop, and
+   on this page they are the only controls a thumb has to hit besides the rows
+   themselves. Padded out to the 44px minimum HERE ONLY — styles.css is not
+   touched, so the nav toggle and footers on every other page are unchanged.
+   Padding rather than a height, so the text stays vertically centred and the
+   hit area grows around it instead of the label moving. */
+.linkhub-topbar .lang-toggle { padding: 2px; }
+.linkhub-topbar .lang-btn {
+  /* The full 44px, not a compromise: this is a real control in a thumb's
+     reach zone, and the pill it sits in growing to 48px is a smaller cost
+     than a target nobody can hit reliably. */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.linkhub-footer .footer-links { gap: 4px 18px; }
+.linkhub-footer .footer-links a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+}

@@ -276,6 +276,10 @@ body {
 
 .field input[type="text"],
 .field input[type="number"],
+/* The link-hub social editor's profile-URL inputs. Added to this existing
+   list rather than styled separately so they are visually identical to every
+   other text field in the console - no element that already existed changes. */
+.field input[type="url"],
 .field textarea,
 .field select,
 .localized-box input,
@@ -370,3 +374,24 @@ body {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ------------------------------------------------- link hub (/links) editor */
+
+/* An id an admin can read and copy but not garble. Read-only, not disabled,
+   so it stays reachable by keyboard and screen reader. */
+.field input.input-readonly {
+  background: var(--bg-2, #f4f5f3);
+  color: var(--dim);
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+/* One social platform's header: its name, and whether an account exists yet. */
+.social-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.social-row-name { font-size: 13.5px; color: var(--ink); }

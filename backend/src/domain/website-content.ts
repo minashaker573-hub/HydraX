@@ -27,6 +27,13 @@ export interface Localized {
 export const SECTION_IDS = [
   'hero', 'navigation', 'problem', 'how', 'product', 'benefits', 'field', 'contact', 'footer', 'sections', 'seo',
   'settings',
+  // The link hub at /links — its own page, so its own section, the same way
+  // privacy/terms are separate pages rather than homepage content. Adding an
+  // id here needs no migration: website_content.section is plain TEXT with
+  // no enum constraint (db/schema.sql), and server.ts seeds any section
+  // missing a row on every boot via seedWebsiteContentIfMissing, which is a
+  // no-op once a row exists. See docs/CMS.md §"Link hub".
+  'linkHub',
 ] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 
@@ -646,6 +653,264 @@ function validateSettings(body: unknown): ValidationResult<SiteSettingsContent> 
 }
 
 /* ========================================================================= */
+/* linkHub (the /links link hub — website/links.html)                        */
+/* ========================================================================= */
+
+/**
+ * The social platforms /links is built to display, and the ONE host a URL for
+ * each is allowed to be on.
+ *
+ * This list is presentation plus an allowlist, never a claim that an account
+ * exists: every platform ships with an empty `url`, and an empty url renders
+ * no row at all (see website/js/links.js). HYDRAX has no LinkedIn page, no
+ * Instagram, no Facebook, no YouTube, no TikTok and no X account, and nothing
+ * in this repository invents one — an admin supplies a real profile URL, or
+ * the row stays absent. A dead link in a social bio costs more trust than a
+ * missing row does.
+ *
+ * `domain` is what makes "only real URLs for the platform they claim to be"
+ * enforceable rather than aspirational: validateSocialUrl below rejects a URL
+ * whose host is not that domain (or a subdomain of it), so a row labelled
+ * LinkedIn cannot quietly point somewhere else. Mirrors the `domain` values
+ * in website/js/links-config.js.
+ */
+export const SOCIAL_PLATFORMS = [
+  { key: 'linkedin', domain: 'linkedin.com' },
+  { key: 'instagram', domain: 'instagram.com' },
+  { key: 'facebook', domain: 'facebook.com' },
+  { key: 'youtube', domain: 'youtube.com' },
+  { key: 'tiktok', domain: 'tiktok.com' },
+  { key: 'x', domain: 'x.com' },
+] as const;
+
+export const SOCIAL_PLATFORM_KEYS = SOCIAL_PLATFORMS.map((p) => p.key) as readonly SocialPlatformKey[];
+export type SocialPlatformKey = (typeof SOCIAL_PLATFORMS)[number]['key'];
+
+const SOCIAL_DOMAINS = new Map<string, string>(SOCIAL_PLATFORMS.map((p) => [p.key, p.domain]));
+
+/**
+ * Destinations allowed on /links.
+ *
+ * Deliberately NOT `validateHref`: that allowlist includes the homepage's
+ * in-page anchors (#problem, #how, …), which do not exist on /links — an
+ * anchor accepted here would save cleanly and then scroll nowhere. So this
+ * accepts only real routes on this site, plus mailto:/tel: for the contact
+ * rows. No external origin and, critically, no `javascript:`/`data:`: the
+ * scheme is decided by what this function names, not by trying to sanitize
+ * whatever arrived.
+ *
+ * Social URLs are the one external case and go through validateSocialUrl
+ * instead, which additionally pins the host.
+ */
+function validateLinkHubHref(value: unknown, path: string, errors: Errors): string {
+  const raw = requireText(value, path, errors, { max: 200 });
+  if (raw === null) return '';
+  if (INTERNAL_ROUTES.has(raw) || MAILTO_RE.test(raw) || TEL_RE.test(raw)) return raw;
+  errors.add(
+    `${path} must be a real page on this site (${[...INTERNAL_ROUTES].join(', ')}), a mailto: link, or a tel: link`,
+  );
+  return raw;
+}
+
+/**
+ * A social profile URL, or '' meaning "this account does not exist yet".
+ *
+ * Never rewritten — an admin's URL is accepted exactly as typed or refused
+ * with a reason, because silently "fixing" a URL is how a link ends up
+ * pointing somewhere nobody chose.
+ */
+function validateSocialUrl(value: unknown, platform: string, path: string, errors: Errors): string {
+  if (value === null || value === undefined || value === '') return '';
+  const raw = requireText(value, path, errors, { max: 300, min: 0 });
+  if (raw === null || raw === '') return '';
+
+  const domain = SOCIAL_DOMAINS.get(platform);
+  if (domain === undefined) {
+    // Unknown platform: the enum check on `platform` has already recorded the
+    // real error, so do not pile a second confusing one on top of it.
+    return raw;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    errors.add(`${path} is not a valid URL`);
+    return raw;
+  }
+  // https only. http: would be downgradeable in transit, and every other
+  // scheme (javascript:, data:, file:, …) has no business being a profile
+  // link at all.
+  if (parsed.protocol !== 'https:') {
+    errors.add(`${path} must start with https:// (got "${parsed.protocol}")`);
+    return raw;
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (host !== domain && !host.endsWith(`.${domain}`)) {
+    errors.add(`${path} must be a ${domain} URL — a ${platform} link cannot point at "${host}"`);
+    return raw;
+  }
+  return raw;
+}
+
+/** A machine handle for a row, so reordering and editing cannot swap two
+ *  rows' identities. Generated by the admin UI, never shown to a visitor. */
+const ID_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
+
+function validateItemId(value: unknown, path: string, errors: Errors): string {
+  const raw = requireText(value, path, errors, { max: 40 });
+  if (raw === null) return '';
+  if (!ID_RE.test(raw)) {
+    errors.add(`${path} must be lowercase letters, digits and hyphens (1–40 characters)`);
+  }
+  return raw;
+}
+
+/**
+ * One row of the hub.
+ *
+ * `order` is deliberately absent as a stored number: the array index IS the
+ * order, exactly as it already is for navigation.items and footer.links. A
+ * separate integer would let two rows claim position 2, and nothing could
+ * then say which the page should believe — an invalid state worth making
+ * unrepresentable rather than validating after the fact. The admin's ↑/↓
+ * controls reorder the array itself.
+ *
+ * `category` is likewise the array a row lives in rather than a field on the
+ * row, so a contact row cannot be labelled "explore" while sitting in the
+ * contact list, and a mailto: cannot end up in a list rendered without one.
+ */
+export interface LinkHubItem {
+  id: string;
+  label: Localized;
+  note: Localized;
+  href: string;
+  visible: boolean;
+}
+
+/** A contact row: same shape plus the value a visitor reads. `display` is the
+ *  number/address as shown (the site shows "0127 915 9200" and dials
+ *  "+20…"), so it is plain text, not prose to translate. */
+export interface LinkHubContactItem extends LinkHubItem {
+  display: string;
+}
+
+export interface LinkHubSocialItem {
+  platform: SocialPlatformKey;
+  label: Localized;
+  url: string;
+  visible: boolean;
+}
+
+export interface LinkHubContent {
+  eyebrow: Localized;
+  tagline: Localized;
+  intro: Localized;
+  primaryLabel: Localized;
+  primaryNote: Localized;
+  primaryHref: string;
+  exploreHeading: Localized;
+  exploreItems: LinkHubItem[];
+  socialHeading: Localized;
+  social: LinkHubSocialItem[];
+  contactHeading: Localized;
+  contactItems: LinkHubContactItem[];
+  location: Localized;
+  footerLinks: NavItem[];
+}
+
+function validateLinkHubItem(item: unknown, path: string, errors: Errors): LinkHubItem {
+  const r = requireRecord(item, path, errors);
+  return {
+    id: validateItemId(r.id, `${path}.id`, errors),
+    label: requireLocalized(r.label, `${path}.label`, errors, { max: 60 }),
+    note: requireLocalized(r.note, `${path}.note`, errors, { min: 0, max: 140 }),
+    href: validateLinkHubHref(r.href, `${path}.href`, errors),
+    visible: typeof r.visible === 'boolean' ? r.visible : true,
+  };
+}
+
+function validateLinkHubContactItem(item: unknown, path: string, errors: Errors): LinkHubContactItem {
+  const base = validateLinkHubItem(item, path, errors);
+  const r = requireRecord(item, path, errors);
+  const display = requireText(r.display, `${path}.display`, errors, { min: 0, max: 120 }) ?? '';
+  // A contact row's destination is a mailto:/tel: by definition — an internal
+  // route here would render a "Call us" row that opens a web page.
+  if (base.href && !MAILTO_RE.test(base.href) && !TEL_RE.test(base.href)) {
+    errors.add(`${path}.href must be a mailto: or tel: link for a contact row`);
+  }
+  return { ...base, display };
+}
+
+function validateLinkHubSocialItem(item: unknown, path: string, errors: Errors): LinkHubSocialItem {
+  const r = requireRecord(item, path, errors);
+  const platform = oneOf(r.platform, SOCIAL_PLATFORM_KEYS, `${path}.platform`, errors);
+  return {
+    platform,
+    label: requireLocalized(r.label, `${path}.label`, errors, { max: 40 }),
+    url: validateSocialUrl(r.url, platform, `${path}.url`, errors),
+    visible: typeof r.visible === 'boolean' ? r.visible : true,
+  };
+}
+
+function validateLinkHub(body: unknown): ValidationResult<LinkHubContent> {
+  const errors = new Errors();
+  const r = requireRecord(body, 'linkHub', errors);
+
+  const value: LinkHubContent = {
+    eyebrow: requireLocalized(r.eyebrow, 'linkHub.eyebrow', errors, { max: 60 }),
+    tagline: requireLocalized(r.tagline, 'linkHub.tagline', errors, { max: 100 }),
+    intro: requireLocalized(r.intro, 'linkHub.intro', errors, { min: 0, max: 200 }),
+
+    primaryLabel: requireLocalized(r.primaryLabel, 'linkHub.primaryLabel', errors, { max: 60 }),
+    primaryNote: requireLocalized(r.primaryNote, 'linkHub.primaryNote', errors, { min: 0, max: 140 }),
+    primaryHref: validateLinkHubHref(r.primaryHref, 'linkHub.primaryHref', errors),
+
+    exploreHeading: requireLocalized(r.exploreHeading, 'linkHub.exploreHeading', errors, { max: 40 }),
+    exploreItems: requireBoundedArray(r.exploreItems, 'linkHub.exploreItems', errors, 0, 8, validateLinkHubItem),
+
+    socialHeading: requireLocalized(r.socialHeading, 'linkHub.socialHeading', errors, { max: 40 }),
+    // Exactly one row per supported platform, always — the six rows are the
+    // editor's surface for "does this account exist yet", not a list an admin
+    // grows. Adding a seventh platform is a code change (an icon has to be
+    // drawn and a domain allowlisted), not a content change.
+    social: requireFixedTuple(
+      r.social, 'linkHub.social', errors, SOCIAL_PLATFORMS.length, validateLinkHubSocialItem,
+    ),
+
+    contactHeading: requireLocalized(r.contactHeading, 'linkHub.contactHeading', errors, { max: 40 }),
+    contactItems: requireBoundedArray(
+      r.contactItems, 'linkHub.contactItems', errors, 0, 4, validateLinkHubContactItem,
+    ),
+    location: requireLocalized(r.location, 'linkHub.location', errors, { min: 0, max: 80 }),
+
+    // Same shape and same href allowlist as the site footer's own links —
+    // no reason for a second validator, but note these go through
+    // validateNavItem's `validateHref`, which also permits the homepage's
+    // in-page anchors. That is correct here: a /links footer link to
+    // "/#contact" is a real destination on another page.
+    footerLinks: requireBoundedArray(r.footerLinks, 'linkHub.footerLinks', errors, 1, 8, validateNavItem),
+  };
+
+  // Ids are the one cross-row invariant: two rows sharing one would make
+  // "which row did the admin just reorder" ambiguous, so it is refused
+  // outright rather than de-duplicated behind the admin's back.
+  const ids = [...value.exploreItems, ...value.contactItems].map((item) => item.id).filter((id) => id !== '');
+  const duplicated = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
+  for (const id of duplicated) errors.add(`linkHub has more than one row with the id "${id}"`);
+
+  // One row per platform, no platform twice — the fixed-tuple check above
+  // only guarantees the count.
+  const platforms = value.social.map((s) => s.platform);
+  for (const key of SOCIAL_PLATFORM_KEYS) {
+    const count = platforms.filter((p) => p === key).length;
+    if (count !== 1) errors.add(`linkHub.social must list ${key} exactly once (found ${count})`);
+  }
+
+  return errors.ok ? { ok: true, value } : { ok: false, errors: errors.list };
+}
+
+/* ========================================================================= */
 /* dispatch                                                                  */
 /* ========================================================================= */
 
@@ -662,6 +927,7 @@ const VALIDATORS: Record<SectionId, (body: unknown) => ValidationResult<unknown>
   sections: validateSections,
   seo: validateSeo,
   settings: validateSettings,
+  linkHub: validateLinkHub,
 };
 
 export function isSectionId(value: string): value is SectionId {
