@@ -115,7 +115,10 @@ export function loadConfig(
 
   return {
     host: env.HYDRAX_HOST ?? '0.0.0.0',
-    port: intFromEnv(env, 'HYDRAX_PORT', 8080),
+    // HYDRAX_PORT wins when set. Otherwise the platform's standard PORT (what
+    // Render and most hosts assign), so the process binds where the host
+    // routes traffic without a HYDRAX-specific setting. 8080 locally.
+    port: intFromEnv(env, 'HYDRAX_PORT', intFromEnv(env, 'PORT', 8080)),
     databaseUrl,
     deviceKey: deviceKey === '' ? null : deviceKey,
     adminKey: adminKey === '' ? null : adminKey,

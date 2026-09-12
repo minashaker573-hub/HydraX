@@ -259,61 +259,73 @@ console.log('\ntechnical files:');
 }
 
 /* --- 10. the link hub ------------------------------------------------------ */
-// /links is the single URL that goes in HYDRAX's social bios, so two things
-// about it have to stay true without anyone remembering to check:
+// /links is the URL that goes in HYDRAX's social bios. Its content is authored
+// in the CMS; links.html is the no-JS fallback and crawler view, and
+// js/links-config.js holds that same fallback as data (and is what the backend
+// seed must equal — asserted in backend/test/link-hub-content.test.ts). What
+// has to stay true here, without anyone remembering to check:
 //
-//   a) js/links-config.js and links.html list the same destinations. The
-//      config drives the rendered page and the markup is what a JS-blocked
-//      visitor and a preview crawler get; if they drift, one audience
-//      silently gets a different, staler set of links than the other.
-//   b) no invented URL is on the page. HYDRAX has no social accounts, and a
-//      dead link in a bio is worse than an absent row — so a profile URL may
-//      only reach the HTML by being added to the config first.
+//   a) the markup lists every fallback destination as a real anchor
+//   b) nothing external is linked that the fallback does not know about
+//   c) no link to a social account that does not exist
+//   d) the team and social sections ship hidden exactly when they are empty
+//   e) every element js/links.js writes into exists in the markup
+//   f) the fallback rows match the fallback data, row for row
+//   g) contact details match the homepage's
+//   h) the RTL fix for phone/email values is still in the stylesheet
+//   i) the view model stays pure, so the backend suite can test it
 console.log('\nlink hub:');
 {
   const linksPath = join(HERE, 'links.html');
   const configPath = join(JS_DIR, 'links-config.js');
+  const rendererPath = join(JS_DIR, 'links.js');
+  const modelPath = join(JS_DIR, 'links-model.js');
+  const cssPath = join(HERE, 'links.css');
+  const required = [linksPath, configPath, rendererPath, modelPath, cssPath];
+  const absentFiles = required.filter((path) => !existsSync(path));
 
-  if (!existsSync(linksPath)) {
-    fail('links.html is missing — /links is the URL used in social bios');
-  } else if (!existsSync(configPath)) {
-    fail('js/links-config.js is missing — /links has no centralized link list');
+  if (absentFiles.length > 0) {
+    for (const path of absentFiles) fail(`link hub file is missing: ${path.slice(HERE.length + 1)}`);
   } else {
     const linksHtml = await readFile(linksPath, 'utf8');
-    const config = await import(pathToFileURL(configPath).href);
-    const socials = config.publishableSocials();
+    const { LINK_HUB_FALLBACK: fallback, SOCIAL_DOMAINS: domains } = await import(pathToFileURL(configPath).href);
+    const shown = (list) => (Array.isArray(list) ? list : []).filter((item) => item && item.visible !== false);
 
-    // (a) every configured destination is in the static markup too.
+    const socials = shown(fallback.social).filter((s) => typeof s.url === 'string' && s.url.trim() !== '');
+    const members = shown(fallback.team).filter((m) => m.name && typeof m.name.en === 'string' && m.name.en.trim() !== '');
+    const profiles = members.map((m) => m.linkedinUrl).filter((url) => typeof url === 'string' && url !== '');
+    const explore = shown(fallback.exploreItems);
+    const contact = shown(fallback.contactItems);
+
+    // (a)
     const configured = [
-      config.PRIMARY_LINK.href,
-      ...config.PROJECT_LINKS.map((link) => link.href),
-      ...socials.map((platform) => platform.url),
-      ...config.CONTACT_LINKS.map((link) => link.href),
+      fallback.primaryHref,
+      ...explore.map((item) => item.href),
+      ...contact.map((item) => item.href),
+      ...shown(fallback.footerLinks).map((link) => link.href),
+      ...socials.map((s) => s.url),
+      ...profiles,
     ];
-    const missing = configured.filter((href) => !linksHtml.includes(`href="${href}"`));
+    const missing = [...new Set(configured)].filter((href) => !linksHtml.includes(`href="${href}"`));
     if (missing.length > 0) {
-      for (const href of missing) {
-        fail(`links-config.js lists ${href}, but links.html has no anchor for it`);
-      }
+      for (const href of missing) fail(`links-config.js lists ${href}, but links.html has no anchor for it`);
     } else {
-      ok(`all ${configured.length} configured link(s) present in links.html`);
+      ok(`all ${new Set(configured).size} fallback destination(s) present in links.html`);
     }
 
-    // (b) nothing leaves this site except a social profile the config knows.
-    const allowedExternal = new Set(socials.map((platform) => platform.url));
+    // (b)
     const external = [...linksHtml.matchAll(/href="(https?:\/\/[^"]+)"/g)].map((m) => m[1]);
+    const allowedExternal = new Set([...socials.map((s) => s.url), ...profiles]);
     const unlisted = external.filter((href) => !allowedExternal.has(href));
     if (unlisted.length > 0) {
-      for (const href of unlisted) {
-        fail(`links.html links to ${href}, which is not in links-config.js — no invented URLs`);
-      }
+      for (const href of unlisted) fail(`links.html links to ${href}, which links-config.js does not list — no invented URLs`);
     } else {
-      ok(`no external link outside links-config.js (${socials.length} social account(s) configured)`);
+      ok(`no external link outside links-config.js (${socials.length} social, ${profiles.length} member profile(s))`);
     }
 
-    // A platform with no account must not have a row anywhere. Matched on the
-    // platform's canonical host, not its name: "hydrax" contains an "x", and a
-    // substring test would read that as an X profile.
+    // (c) Matched on the parsed host, never a substring ("hydrax" contains
+    // an "x"). A team member's own LinkedIn is not a HYDRAX account and is
+    // excluded from the LinkedIn platform check.
     const onHost = (href, domain) => {
       try {
         const { hostname } = new URL(href);
@@ -322,80 +334,153 @@ console.log('\nlink hub:');
         return false;
       }
     };
-
-    const unpublished = (config.SOCIAL_PLATFORMS ?? []).filter(
-      (platform) => typeof platform.url !== 'string' || platform.url.trim() === '',
-    );
-    const ghosts = unpublished.filter((platform) =>
-      external.some((href) => onHost(href, platform.domain)),
-    );
+    const unpublished = shown(fallback.social).filter((s) => !(typeof s.url === 'string' && s.url.trim() !== ''));
+    const ghosts = unpublished.filter((s) =>
+      external.some((href) => onHost(href, domains[s.platform]) && !profiles.includes(href)));
     if (ghosts.length > 0) {
-      for (const platform of ghosts) {
-        fail(`links.html has a ${platform.domain} link, but no ${platform.label} account exists`);
-      }
+      for (const s of ghosts) fail(`links.html links to ${domains[s.platform]}, but no ${s.platform} account exists`);
     } else {
-      ok(`${unpublished.length} platform(s) with no account are correctly absent`);
+      ok(`${unpublished.length} social platform(s) with no account have no link — including no HYDRAX LinkedIn`);
     }
 
-    // And a URL that IS configured must point at the platform it claims to be.
-    const misrouted = socials.filter((platform) => !onHost(platform.url, platform.domain));
-    if (misrouted.length > 0) {
-      for (const platform of misrouted) {
-        fail(`${platform.label} is configured as ${platform.url}, which is not on ${platform.domain}`);
-      }
-    } else if (socials.length > 0) {
-      ok(`${socials.length} social URL(s) point at the right platform`);
+    // (d)
+    const sectionTag = (id) => (linksHtml.match(new RegExp(`<section[^>]*id="${id}"[^>]*>`)) || [''])[0];
+    const isHidden = (id) => /\shidden(?=[\s>=])/.test(sectionTag(id));
+    const memberRows = (linksHtml.match(/class="lh-member"/g) || []).length;
+    if (members.length === 0 && !(isHidden('linkhub-team-section') && memberRows === 0)) {
+      fail('the fallback has no team members, so links.html must ship #linkhub-team-section hidden and empty');
+    } else if (members.length > 0 && (isHidden('linkhub-team-section') || memberRows !== members.length)) {
+      fail(`the fallback lists ${members.length} member(s) but links.html shows ${memberRows}`);
+    } else {
+      ok(members.length === 0
+        ? 'team section ships hidden and empty — no member exists in the repository, none invented'
+        : `team section lists all ${members.length} fallback member(s)`);
+    }
+    if (socials.length === 0 && !isHidden('linkhub-social-section')) {
+      fail('no social account exists, so links.html must ship #linkhub-social-section hidden');
+    } else {
+      ok(socials.length === 0 ? 'social section ships hidden — no empty "Follow" heading' : 'social section visible');
     }
 
-    // (c) every element js/links.js writes published CMS content into
-    // actually exists in the markup.
-    //
-    // This is the join between the static fallback and the CMS: links.js
-    // reaches its render targets by id, and a renamed or dropped id makes it
-    // silently stop updating that field - the page keeps showing the static
-    // default and looks fine, while an admin's published edit never appears.
-    // Nothing else would catch that, so the ids the renderer asks for are
-    // read out of the renderer itself and checked against the page.
-    const renderer = await readFile(join(JS_DIR, 'links.js'), 'utf8');
-    const wantedIds = [...renderer.matchAll(/getElementById\('([^']+)'\)/g)].map((m) => m[1]);
-    const setTextIds = [...renderer.matchAll(/setText\('([^']+)'/g)].map((m) => m[1]);
-    const renderIds = [...renderer.matchAll(/render\('([^']+)'/g)].map((m) => m[1]);
-    const targets = [...new Set([...wantedIds, ...setTextIds, ...renderIds])]
-      // The preview banner is created by links.js, not present in the page.
-      .filter((id) => id !== 'hydrax-preview-banner');
-    const absent = targets.filter((id) => !new RegExp(`id="${id}"`).test(linksHtml));
-    if (absent.length > 0) {
-      for (const id of absent) {
-        fail(`js/links.js renders CMS content into #${id}, which does not exist in links.html`);
-      }
+    // (e) A renamed id makes links.js silently stop updating that field: the
+    // page keeps its static default and looks fine while published edits
+    // never appear. So the ids are read out of the renderer itself.
+    const renderer = await readFile(rendererPath, 'utf8');
+    const targets = [...new Set([...renderer.matchAll(/'(linkhub-[a-z0-9-]+)'/g)].map((m) => m[1]))];
+    const absentIds = targets.filter((id) => !new RegExp(`id="${id}"`).test(linksHtml));
+    if (absentIds.length > 0) {
+      for (const id of absentIds) fail(`js/links.js renders into #${id}, which does not exist in links.html`);
     } else {
-      ok(`all ${targets.length} CMS render target(s) exist in links.html`);
+      ok(`all ${targets.length} render target id(s) exist in links.html`);
     }
 
-    // The static fallback must stay complete on its own. If links.js were to
-    // become the only thing that puts links on the page, a JS-blocked
-    // visitor and every unfurl crawler would get an empty hub.
-    const fallbackRows = (linksHtml.match(/class="linkhub-row"/g) || []).length;
-    if (fallbackRows >= configured.length - 1) {
-      ok(`static fallback still carries ${fallbackRows} row(s) with no JavaScript`);
-    } else {
+    // (f) If the markup were hollowed out, a JS-blocked visitor and every
+    // unfurl crawler would get an empty hub.
+    const linkRows = (linksHtml.match(/class="lh-link"/g) || []).length;
+    const contactRows = (linksHtml.match(/class="lh-contact-link"/g) || []).length;
+    if (linkRows !== explore.length || contactRows !== contact.length) {
       fail(
-        `links.html has only ${fallbackRows} static row(s) for ${configured.length} configured link(s) `
-          + '- the no-JS fallback has been hollowed out',
+        `links.html fallback has ${linkRows} link row(s) and ${contactRows} contact row(s); `
+          + `links-config.js has ${explore.length} and ${contact.length}`,
       );
+    } else {
+      ok(`fallback markup matches the data row for row (${linkRows} link, ${contactRows} contact)`);
     }
 
-    // (d) the contact details match the rest of the site rather than being
-    // new ones invented for this page.
+    // (g)
     const indexHtml = await readFile(join(HERE, 'index.html'), 'utf8');
     const contactHrefs = [...linksHtml.matchAll(/href="((?:mailto|tel):[^"]+)"/g)].map((m) => m[1]);
     const invented = contactHrefs.filter((href) => !indexHtml.includes(`href="${href}"`));
     if (invented.length > 0) {
-      for (const href of invented) {
-        fail(`links.html contacts via ${href}, which does not appear on index.html`);
-      }
+      for (const href of invented) fail(`links.html contacts via ${href}, which does not appear on index.html`);
     } else {
-      ok(`${contactHrefs.length} contact method(s) match the rest of the site`);
+      ok(`${contactHrefs.length} contact method(s) match the homepage`);
+    }
+
+    // (h)
+    const css = await readFile(cssPath, 'utf8');
+    const valueRule = (css.match(/\.lh-contact-value\s*\{[^}]*\}/) || [''])[0];
+    if (/direction:\s*ltr/.test(valueRule) && /unicode-bidi:\s*isolate/.test(valueRule)) {
+      ok('phone/email values stay left-to-right and isolated in Arabic');
+    } else {
+      fail('.lh-contact-value lost `direction: ltr; unicode-bidi: isolate` — the phone number would reorder in Arabic');
+    }
+
+    // (i)
+    const model = await readFile(modelPath, 'utf8');
+    const impure = ['document.', 'window.', 'fetch(', 'localStorage'].filter((token) => model.includes(token));
+    if (impure.length > 0) {
+      fail(`js/links-model.js must stay pure, but uses: ${impure.join(', ')}`);
+    } else {
+      ok('js/links-model.js is pure (no DOM, network or storage)');
+    }
+  }
+}
+
+/* --- 11. Vercel deployment config ------------------------------------------ */
+// website/vercel.json proxies the backend's routes from Render so the site,
+// /links, admin and dashboard all share one origin (see docs/DEPLOYMENT.md).
+// Three things must stay true, or production breaks in a way no local run
+// would show:
+//   a) it is valid JSON with no leftover placeholder
+//   b) every proxy rewrite targets the SAME https origin — one backend
+//   c) no proxied path may be cached on Vercel's CDN. /api/v1/admin responses
+//      are authenticated by header; a cached one could be served to someone
+//      without the key. The backend sends no-store as well; this is the
+//      second, independent lock.
+//   d) the CSP stays same-origin — the proxy is what makes that possible
+console.log('\nvercel deployment config:');
+{
+  const vercelPath = join(HERE, 'vercel.json');
+  if (!existsSync(vercelPath)) {
+    fail('vercel.json is missing — the Vercel deployment has no rewrites or security headers');
+  } else {
+    const raw = await readFile(vercelPath, 'utf8');
+    let cfg = null;
+    try {
+      cfg = JSON.parse(raw);
+      ok('vercel.json is valid JSON');
+    } catch (error) {
+      fail(`vercel.json is not valid JSON: ${error.message}`);
+    }
+    if (cfg) {
+      if (/REPLACE|YOUR-DOMAIN|example\.com/i.test(raw)) fail('vercel.json still contains a placeholder');
+      else ok('no placeholder values');
+
+      const rewrites = Array.isArray(cfg.rewrites) ? cfg.rewrites : [];
+      const external = rewrites.filter((r) => /^https?:\/\//.test(String(r.destination)));
+      const origins = [...new Set(external.map((r) => new URL(r.destination).origin))];
+      if (origins.length !== 1) {
+        fail(`proxy rewrites must target exactly one backend origin, found: ${origins.join(', ') || 'none'}`);
+      } else if (!origins[0].startsWith('https://')) {
+        fail(`backend origin must be https, got ${origins[0]}`);
+      } else {
+        ok(`${external.length} proxy rewrite(s) all target ${origins[0]}`);
+      }
+
+      const REQUIRED = ['/api/:path*', '/admin', '/admin/:path*', '/dashboard', '/dashboard/:path*'];
+      const missing = REQUIRED.filter((src) => !external.some((r) => r.source === src));
+      if (missing.length) fail(`vercel.json does not proxy: ${missing.join(', ')}`);
+      else ok('api, admin and dashboard are proxied to the backend');
+
+      const noCache = new Set((cfg.headers || [])
+        .filter((h) => (h.headers || []).some((x) => x.key.toLowerCase() === 'x-vercel-enable-rewrite-caching' && String(x.value) === '0'))
+        .map((h) => h.source));
+      const cacheable = external.filter((r) => !noCache.has(r.source)).map((r) => r.source);
+      if (cacheable.length) fail(`proxied path(s) could be cached on Vercel's CDN: ${cacheable.join(', ')}`);
+      else ok('CDN caching disabled on every proxied path');
+
+      const csp = (cfg.headers || []).flatMap((h) => h.headers || [])
+        .find((x) => x.key.toLowerCase() === 'content-security-policy');
+      const connect = csp && (csp.value.match(/connect-src([^;]*)/) || [])[1];
+      if (!csp) fail('vercel.json sets no Content-Security-Policy');
+      else if (!connect || connect.trim() !== "'self'") fail(`CSP connect-src must be 'self' only, got "${connect}"`);
+      else ok("CSP connect-src is 'self' only");
+
+      // The public pages themselves are static files on Vercel, never proxied.
+      const proxiedPages = external.filter((r) => ['/', '/links', '/request', '/privacy', '/terms'].includes(r.source));
+      if (proxiedPages.length) fail(`public pages must be served by Vercel, not proxied: ${proxiedPages.map((r) => r.source).join(', ')}`);
+      else ok('public pages are served statically by Vercel');
     }
   }
 }

@@ -1,0 +1,45 @@
+# HYDRAX — backend on Render (Blueprint).
+#
+# The backend is one long-running Node process: the API, plus the dashboard
+# (/dashboard), the operator console (/admin) and the website it also serves.
+# It cannot run on Vercel — background jobs and an in-memory rate limiter need
+# a process that stays alive. The public website is ALSO deployed to Vercel,
+# which proxies /api, /admin, /dashboard and /assets/uploads here; see
+# website/vercel.json and docs/DEPLOYMENT.md.
+#
+# No rootDir on purpose: the server reads ../website, ../dashboard and
+# ../admin at runtime, so the whole repository must be present. Commands
+# change into backend/ instead.
+#
+# Secrets (sync: false) are entered in the Render dashboard when the Blueprint
+# is first created. They are never written in this file.
+
+services:
+  - type: web
+    name: hydrax-api
+    runtime: node
+    plan: free
+    buildCommand: cd backend && npm ci
+    startCommand: cd backend && npm start
+    # Liveness only — does not touch the database, so a slow database never
+    # makes Render restart a healthy process.
+    healthCheckPath: /health/live
+    autoDeployTrigger: commit
+    envVars:
+      # The server runs TypeScript directly (node src/server.ts), which needs
+      # a Node release with built-in type stripping.
+      - key: NODE_VERSION
+        value: "24"
+      - key: HYDRAX_HOST
+        value: 0.0.0.0
+      - key: HYDRAX_LOG_LEVEL
+        value: INFO
+      # Shared secret the ESP32 controllers send in X-Device-Key.
+      - key: HYDRAX_DEVICE_KEY
+        sync: false
+      # Operator key for /admin. Must differ from the device key.
+      - key: HYDRAX_ADMIN_KEY
+        sync: false
+      # Supabase "Session pooler" connection string — see docs/CONFIGURATION.md.
+      - key: HYDRAX_DATABASE_URL
+        sync: false

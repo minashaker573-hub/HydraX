@@ -21,6 +21,12 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.png': 'image/png',
+  // CMS media uploads (routes/media.ts) accept JPEG, PNG and WebP. Without
+  // these, uploaded photos were served as application/octet-stream alongside
+  // X-Content-Type-Options: nosniff.
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
   '.xml': 'application/xml; charset=utf-8',

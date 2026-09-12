@@ -111,6 +111,15 @@ describe('numeric settings', () => {
     assert.throws(() => load({ ...base, HYDRAX_RETENTION_DAYS: '-1' }), ConfigError);
   });
 
+  test('falls back to the platform PORT when HYDRAX_PORT is unset', () => {
+    // Render (and most hosts) assign PORT and route traffic to it.
+    assert.equal(load({ ...base, PORT: '10000' }).port, 10000);
+    // An explicit HYDRAX_PORT still wins.
+    assert.equal(load({ ...base, PORT: '10000', HYDRAX_PORT: '9000' }).port, 9000);
+    // A malformed PORT is refused, not silently replaced with 8080.
+    assert.throws(() => load({ ...base, PORT: 'abc' }), ConfigError);
+  });
+
   test('retention of 0 is honoured as "never prune"', () => {
     assert.equal(load({ ...base, HYDRAX_RETENTION_DAYS: '0' }).retentionDays, 0);
   });
