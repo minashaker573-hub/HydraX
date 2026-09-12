@@ -62,6 +62,22 @@ fails if its critical parts are removed.
 
 Every push to `master` redeploys.
 
+### If the admin, dashboard or team section do not load
+
+All three depend on the backend function. Open `https://<your-domain>/health`.
+If startup failed it answers `503` and says why, without revealing any value:
+
+- `"reason":"configuration"` with `"missing":[…]` — those environment
+  variables are not set **for the Production environment**. Add them under
+  Settings → Environment Variables (tick *Production*), then **Redeploy**:
+  environment variable changes only apply to new deployments.
+- `"reason":"database"` with a `"code"` — Supabase refused or did not answer;
+  the `hint` names the likely fix (wrong password, wrong pooler URI, …).
+
+If every `*.vercel.app` URL redirects to a Vercel login page, that is
+**Deployment Protection**. Keep it off for the production domain
+(Settings → Deployment Protection) so `/links` works as a public bio link.
+
 ---
 
 ## How it differs from running `npm start`

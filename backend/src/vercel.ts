@@ -16,6 +16,10 @@
  *   - Startup runs once per function instance, lazily, on the first request.
  *     A failed startup is not cached: the next request tries again, so a
  *     database that was briefly unreachable does not wedge the instance.
+ *     While it fails, every request answers 503 with a SAFE diagnosis — which
+ *     environment variable names are missing, or the database error code —
+ *     so a misconfigured deployment explains itself at /health instead of
+ *     only in the function logs. Values, hostnames and messages never appear.
  *   - There are no timers — a function instance is not kept alive to fire
  *     them. The offline sweep instead runs, at most once per sweep interval,
  *     just before GET /api/v1/dashboard or /api/v1/alerts is answered: the two
@@ -41,6 +45,8 @@ const SWEEP_ON_READ = new Set(['/api/v1/dashboard', '/api/v1/alerts']);
 export const CRON_PATH = '/api/cron/maintenance';
 /** Query parameter vercel.json's rewrites use to carry the original path. */
 export const ORIGINAL_PATH_PARAM = '__hydrax_path';
+
+const REQUIRED_ENV = ['HYDRAX_DATABASE_URL', 'HYDRAX_DEVICE_KEY', 'HYDRAX_ADMIN_KEY'] as const;
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, {
@@ -71,6 +77,62 @@ export function restoreOriginalUrl(req: IncomingMessage): void {
   url.searchParams.delete(ORIGINAL_PATH_PARAM);
   const query = url.searchParams.toString();
   req.url = query === '' ? original : `${original}?${query}`;
+}
+
+export interface StartupDiagnosis {
+  error: 'service unavailable';
+  reason: 'configuration' | 'database';
+  /** Names of required environment variables that are empty or absent. */
+  missing?: string[];
+  /** A database driver or network error code, e.g. 28P01 or ENOTFOUND. */
+  code?: string;
+  hint: string;
+}
+
+/** Plain-language hints for the database failures a deployment actually hits. */
+const DATABASE_HINTS: Record<string, string> = {
+  '28P01': 'The database rejected the username or password in HYDRAX_DATABASE_URL.',
+  '28000': 'The database rejected the username or password in HYDRAX_DATABASE_URL.',
+  XX000: 'The Supabase pooler did not recognise the project or user in HYDRAX_DATABASE_URL — use the Session pooler URI exactly as Supabase shows it.',
+  ENOTFOUND: 'The database host in HYDRAX_DATABASE_URL does not exist.',
+  EAI_AGAIN: 'The database host in HYDRAX_DATABASE_URL could not be resolved.',
+  ECONNREFUSED: 'The database refused the connection. Check the host and port in HYDRAX_DATABASE_URL.',
+  ETIMEDOUT: 'The database did not answer in time. Use Supabase\'s Session pooler URI, not the direct connection.',
+  TIMEOUT: 'The database did not answer in time. Use Supabase\'s Session pooler URI, not the direct connection.',
+};
+
+/**
+ * What a failed startup may safely tell a visitor. Deliberately built from
+ * facts rather than the error message: messages can contain hostnames,
+ * usernames or values. Variable NAMES and error CODES are not secrets.
+ */
+export function describeStartupFailure(error: unknown, env: NodeJS.ProcessEnv): StartupDiagnosis {
+  if (error instanceof ConfigError) {
+    const insecure = env.HYDRAX_ALLOW_INSECURE === 'true';
+    const required = insecure ? ['HYDRAX_DATABASE_URL'] : [...REQUIRED_ENV];
+    const missing = required.filter((name) => (env[name] ?? '').trim() === '');
+    return {
+      error: 'service unavailable',
+      reason: 'configuration',
+      missing,
+      hint: missing.length > 0
+        ? 'Set these environment variables for the Production environment in the Vercel project settings, then redeploy.'
+        : 'An environment variable has an invalid value (for example HYDRAX_ADMIN_KEY equal to HYDRAX_DEVICE_KEY). The function logs name it.',
+    };
+  }
+
+  const rawCode = (error as { code?: unknown } | null)?.code;
+  const message = error instanceof Error ? error.message : '';
+  const code = typeof rawCode === 'string' && /^[A-Z0-9_]{2,40}$/.test(rawCode)
+    ? rawCode
+    : /timeout/i.test(message) ? 'TIMEOUT' : undefined;
+  return {
+    error: 'service unavailable',
+    reason: 'database',
+    ...(code === undefined ? {} : { code }),
+    hint: (code !== undefined && DATABASE_HINTS[code])
+      || 'The backend could not connect to or prepare the database. Check HYDRAX_DATABASE_URL; the function logs have the details.',
+  };
 }
 
 export interface VercelHandlerOptions {
@@ -107,9 +169,9 @@ export function createVercelHandler(options: VercelHandlerOptions): VercelHandle
       rt = await runtime();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      // Full detail goes to the function logs only.
       log.error(error instanceof ConfigError ? 'config' : 'startup', message);
-      // Configuration detail is for the logs, never the response.
-      sendJson(res, 503, { error: 'service unavailable' });
+      sendJson(res, 503, describeStartupFailure(error, env));
       return;
     }
 

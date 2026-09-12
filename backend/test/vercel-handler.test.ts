@@ -107,7 +107,11 @@ test('a failed startup answers 503 without leaking detail, and is retried on the
   try {
     const first = await call(fn.url, '/health/live');
     assert.equal(first.status, 503);
-    assert.deepEqual(first.body, { error: 'service unavailable' });
+    assert.equal(first.body.error, 'service unavailable');
+    // A misconfigured deployment explains itself — by variable NAME only.
+    assert.equal(first.body.reason, 'configuration');
+    assert.deepEqual(first.body.missing, ['HYDRAX_DATABASE_URL', 'HYDRAX_DEVICE_KEY', 'HYDRAX_ADMIN_KEY']);
+    assert.ok(!JSON.stringify(first.body).includes('secret-detail-that-must-not-leak'));
 
     const second = await call(fn.url, '/health/live');
     assert.equal(second.status, 200, 'a transient startup failure must not wedge the instance');
@@ -118,6 +122,41 @@ test('a failed startup answers 503 without leaking detail, and is retried on the
   } finally {
     await fn.close();
     await h.close();
+  }
+});
+
+test('a database failure at startup reports only its code and a hint — never host, user or message', async () => {
+  const dbError = Object.assign(
+    new Error('password authentication failed for user "postgres.abcdefgh" at aws-0-eu-central-1.pooler.supabase.com'),
+    { code: '28P01' },
+  );
+  const env = { HYDRAX_DATABASE_URL: 'postgresql://postgres.abcdefgh:hunter2@aws-0-eu-central-1.pooler.supabase.com:5432/postgres', HYDRAX_DEVICE_KEY: 'd', HYDRAX_ADMIN_KEY: 'a' };
+  const fn = await serve(createVercelHandler({ boot: async () => { throw dbError; }, env }));
+  try {
+    const res = await call(fn.url, '/api/v1/website-content');
+    assert.equal(res.status, 503);
+    assert.equal(res.body.reason, 'database');
+    assert.equal(res.body.code, '28P01');
+    assert.match(String(res.body.hint), /username or password/);
+    const text = JSON.stringify(res.body);
+    for (const secret of ['hunter2', 'postgres.abcdefgh', 'pooler.supabase.com', 'password authentication failed']) {
+      assert.ok(!text.includes(secret), `the response must not contain "${secret}"`);
+    }
+  } finally {
+    await fn.close();
+  }
+
+  // A timeout without a code still gets a useful category, and nothing else.
+  const timeout = await serve(createVercelHandler({
+    boot: async () => { throw new Error('Connection terminated due to connection timeout at db.internal:6543'); },
+    env,
+  }));
+  try {
+    const res = await call(timeout.url, '/health');
+    assert.equal(res.body.code, 'TIMEOUT');
+    assert.ok(!JSON.stringify(res.body).includes('db.internal'));
+  } finally {
+    await timeout.close();
   }
 });
 

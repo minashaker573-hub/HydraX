@@ -63,8 +63,37 @@ async function api(path, options = {}) {
     forgetKey('That key was not accepted.');
     throw new Error('unauthorized');
   }
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.ok) {
+    // Keep what the server said: on Vercel a backend that failed to start
+    // answers 503 with a safe diagnosis (missing variable names, or a
+    // database error code). See backend/src/vercel.ts.
+    const error = new Error(`HTTP ${response.status}`);
+    error.status = response.status;
+    try {
+      error.detail = await response.json();
+    } catch {
+      error.detail = null;
+    }
+    throw error;
+  }
   return response.json();
+}
+
+/** What to tell the operator when the key check fails for a reason other
+ *  than a wrong key. Built only from the server's safe diagnosis fields. */
+function describeGateFailure(error) {
+  if (!error || typeof error.status !== 'number') {
+    return 'Could not reach the server. Check your connection and try again.';
+  }
+  const detail = error.detail && typeof error.detail === 'object' ? error.detail : {};
+  if (detail.reason === 'configuration' && Array.isArray(detail.missing) && detail.missing.length > 0) {
+    return `The server is running but not configured. Missing: ${detail.missing.join(', ')}. ${detail.hint || ''}`.trim();
+  }
+  if (detail.reason === 'configuration' || detail.reason === 'database') {
+    const code = typeof detail.code === 'string' ? ` (${detail.code})` : '';
+    return `The server is running but could not start${code}. ${detail.hint || ''}`.trim();
+  }
+  return `The server answered with an error (HTTP ${error.status}). Try again in a moment.`;
 }
 
 /* ----------------------------------------------------------------- gate -- */
@@ -97,10 +126,11 @@ gateForm.addEventListener('submit', async (event) => {
   adminKey = candidate;
   try {
     await api('/api/v1/requests?limit=1');
-  } catch {
-    // forgetKey already reported a 401; anything else is a transport problem.
+  } catch (error) {
+    // forgetKey already reported a 401. Anything else is either no response
+    // at all, or a server that answered but is not ready — say which.
     if (adminKey !== null) {
-      gateError.textContent = 'Could not reach the server. Is the backend running?';
+      gateError.textContent = describeGateFailure(error);
       gateError.hidden = false;
       adminKey = null;
     }
