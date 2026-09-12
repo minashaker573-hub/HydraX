@@ -722,6 +722,41 @@ export class Repository {
     });
   }
 
+  /**
+   * Applies a pure upgrade function to a section's stored draft and published
+   * rows, each independently, inside one transaction. `upgrade` returns null
+   * for "nothing to change", in which case the row is not written at all — so
+   * timestamps only move when content genuinely did, and running this on
+   * every boot is a no-op once a database is current.
+   *
+   * `published_at` is deliberately left alone: an upgrade fills in fields a
+   * newer release added, it is not an admin publishing something.
+   */
+  async upgradeWebsiteContent(
+    section: SectionId,
+    upgrade: (stored: unknown) => Record<string, unknown> | null,
+    now: string,
+  ): Promise<{ draft: boolean; published: boolean }> {
+    return this.#transaction(async (client) => {
+      const changed = { draft: false, published: false };
+      for (const status of ['draft', 'published'] as const) {
+        const row = await client.query<{ data: unknown }>(
+          'SELECT data FROM website_content WHERE section = $1 AND status = $2 FOR UPDATE',
+          [section, status],
+        );
+        if (row.rows[0] === undefined) continue;
+        const next = upgrade(row.rows[0].data);
+        if (next === null) continue;
+        await client.query(
+          'UPDATE website_content SET data = $3, updated_at = $4 WHERE section = $1 AND status = $2',
+          [section, status, JSON.stringify(next), now],
+        );
+        changed[status] = true;
+      }
+      return changed;
+    });
+  }
+
   // -------------------------------------------------------------------------
   // website media
   // -------------------------------------------------------------------------

@@ -15,8 +15,8 @@ import { ConfigError, loadConfig } from './config.ts';
 import { closeDatabase, openDatabase } from './db/index.ts';
 import { Repository } from './db/repository.ts';
 import { sweepOfflineDevices } from './domain/alerts.ts';
-import { DEFAULT_WEBSITE_CONTENT } from './domain/website-content-seed.ts';
-import { SECTION_IDS } from './domain/website-content.ts';
+import { DEFAULT_WEBSITE_CONTENT, LINKHUB_SEED_V1 } from './domain/website-content-seed.ts';
+import { SECTION_IDS, upgradeSeededContent } from './domain/website-content.ts';
 import { log } from './log.ts';
 import type { AppDeps } from './deps.ts';
 
@@ -64,6 +64,24 @@ async function main(): Promise<void> {
   const seedNow = new Date(Date.now()).toISOString();
   for (const section of SECTION_IDS) {
     await repo.seedWebsiteContentIfMissing(section, DEFAULT_WEBSITE_CONTENT[section], seedNow);
+  }
+
+  // The link hub gained fields (the team) after its first release. A database
+  // seeded by that release has rows without them, which the current validator
+  // would refuse to re-save. This fills in missing fields and moves values
+  // that were never edited to the new defaults; any admin edit is kept as-is.
+  // A no-op once the rows are current. See upgradeSeededContent.
+  const linkHubUpgrade = await repo.upgradeWebsiteContent(
+    'linkHub',
+    (stored) => upgradeSeededContent(stored, LINKHUB_SEED_V1, DEFAULT_WEBSITE_CONTENT.linkHub),
+    seedNow,
+  );
+  if (linkHubUpgrade.draft || linkHubUpgrade.published) {
+    log.info(
+      'cms',
+      `linkHub: upgraded stored content to the current schema (draft: ${linkHubUpgrade.draft}, `
+        + `published: ${linkHubUpgrade.published}); admin edits were preserved`,
+    );
   }
 
   const server = createServer(createApp(deps));

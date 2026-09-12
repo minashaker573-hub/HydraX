@@ -713,24 +713,42 @@ function validateLinkHubHref(value: unknown, path: string, errors: Errors): stri
 }
 
 /**
- * A social profile URL, or '' meaning "this account does not exist yet".
+ * The one external-URL check in the link hub, shared by social accounts and
+ * team members' LinkedIn profiles so the two cannot drift into different
+ * ideas of what "a safe profile link" means.
  *
- * Never rewritten — an admin's URL is accepted exactly as typed or refused
- * with a reason, because silently "fixing" a URL is how a link ends up
- * pointing somewhere nobody chose.
+ * Returns '' for an absent value ("no such profile exists yet") and the raw
+ * string otherwise. Never rewritten: an admin's URL is accepted exactly as
+ * typed or refused with a reason, because silently "fixing" a URL is how a
+ * link ends up pointing somewhere nobody chose.
+ *
+ * Refused, each with a message naming the rule:
+ *   - anything `new URL` cannot parse (no scheme, spaces, "https://")
+ *   - any scheme but https: — http: is downgradeable in transit, and
+ *     javascript:/data:/file: have no business being a profile link at all
+ *   - embedded credentials (https://user@host) and explicit ports, both
+ *     classic ways to make a URL read as one host and resolve as another
+ *   - a host outside `hosts`. Matching is on the parsed hostname, never a
+ *     substring, so linkedin.com.evil.example and notlinkedin.com fail.
  */
-function validateSocialUrl(value: unknown, platform: string, path: string, errors: Errors): string {
+function validatePinnedHttpsUrl(
+  value: unknown,
+  path: string,
+  errors: Errors,
+  hosts: { exact: readonly string[]; subdomainsOf?: string },
+  describe: string,
+): string {
   if (value === null || value === undefined || value === '') return '';
+  // Checked on the value exactly as received, before the shared text helper
+  // (which normalizes surrounding whitespace) or `new URL` (which strips it)
+  // can touch it: a URL with a stray space is refused, never quietly trimmed
+  // into something the admin did not type.
+  if (typeof value === 'string' && value !== value.trim()) {
+    errors.add(`${path} must not start or end with spaces`);
+    return value;
+  }
   const raw = requireText(value, path, errors, { max: 300, min: 0 });
   if (raw === null || raw === '') return '';
-
-  const domain = SOCIAL_DOMAINS.get(platform);
-  if (domain === undefined) {
-    // Unknown platform: the enum check on `platform` has already recorded the
-    // real error, so do not pile a second confusing one on top of it.
-    return raw;
-  }
-
   let parsed: URL;
   try {
     parsed = new URL(raw);
@@ -738,17 +756,65 @@ function validateSocialUrl(value: unknown, platform: string, path: string, error
     errors.add(`${path} is not a valid URL`);
     return raw;
   }
-  // https only. http: would be downgradeable in transit, and every other
-  // scheme (javascript:, data:, file:, …) has no business being a profile
-  // link at all.
   if (parsed.protocol !== 'https:') {
     errors.add(`${path} must start with https:// (got "${parsed.protocol}")`);
     return raw;
   }
-  const host = parsed.hostname.toLowerCase();
-  if (host !== domain && !host.endsWith(`.${domain}`)) {
-    errors.add(`${path} must be a ${domain} URL — a ${platform} link cannot point at "${host}"`);
+  if (parsed.username !== '' || parsed.password !== '') {
+    errors.add(`${path} must not contain a username or password`);
     return raw;
+  }
+  if (parsed.port !== '') {
+    errors.add(`${path} must not specify a port`);
+    return raw;
+  }
+  const host = parsed.hostname.toLowerCase();
+  const allowed = hosts.exact.includes(host)
+    || (hosts.subdomainsOf !== undefined && host.endsWith(`.${hosts.subdomainsOf}`));
+  if (!allowed) {
+    errors.add(`${path} must be ${describe} — "${host}" is not allowed`);
+    return raw;
+  }
+  return raw;
+}
+
+/** A social account URL: https on that platform's own domain or a subdomain
+ *  of it (eg.linkedin.com is LinkedIn's own regional host). */
+function validateSocialUrl(value: unknown, platform: string, path: string, errors: Errors): string {
+  const domain = SOCIAL_DOMAINS.get(platform);
+  if (domain === undefined) {
+    // Unknown platform: the enum check on `platform` has already recorded the
+    // real error, so do not pile a second confusing one on top of it.
+    return typeof value === 'string' ? value : '';
+  }
+  return validatePinnedHttpsUrl(
+    value, path, errors, { exact: [domain], subdomainsOf: domain },
+    `a ${domain} URL — a ${platform} link cannot point anywhere else`,
+  );
+}
+
+/**
+ * A team member's LinkedIn profile.
+ *
+ * Deliberately stricter than the social-account rule: exactly linkedin.com or
+ * www.linkedin.com, no other subdomain, and a real path. A member row renders
+ * as "View <name>'s LinkedIn profile", so a bare https://linkedin.com/ (the
+ * site's front page, not a person) would be a link that says one thing and
+ * does another.
+ */
+const LINKEDIN_PROFILE_HOSTS = ['linkedin.com', 'www.linkedin.com'] as const;
+
+function validateLinkedInProfileUrl(value: unknown, path: string, errors: Errors): string {
+  const before = errors.list.length;
+  const raw = validatePinnedHttpsUrl(
+    value, path, errors, { exact: LINKEDIN_PROFILE_HOSTS },
+    'a LinkedIn profile URL on linkedin.com or www.linkedin.com',
+  );
+  if (raw !== '' && errors.list.length === before) {
+    const { pathname } = new URL(raw);
+    if (pathname.replace(/\/+$/, '') === '') {
+      errors.add(`${path} must link to a specific LinkedIn profile, not linkedin.com itself`);
+    }
   }
   return raw;
 }
@@ -802,6 +868,29 @@ export interface LinkHubSocialItem {
   visible: boolean;
 }
 
+/**
+ * One person on the HYDRAX team.
+ *
+ * Deliberately NOT a social account. A member's LinkedIn is that person's own
+ * profile and lives in "Meet the team"; HYDRAX itself has no LinkedIn page,
+ * and nothing here can create one.
+ *
+ * Every field except the name may be empty, and that is intentional: a real
+ * member without a public LinkedIn renders without the action rather than
+ * pushing an admin to paste something plausible, and a member without a
+ * photo gets an initials mark. The seed ships ZERO members — no name, role or
+ * profile for the team exists anywhere in this repository, so none is
+ * invented; the section stays off the page until an admin adds a real person.
+ */
+export interface LinkHubTeamMember {
+  id: string;
+  name: Localized;
+  role: Localized;
+  linkedinUrl: string;
+  image: string;
+  visible: boolean;
+}
+
 export interface LinkHubContent {
   eyebrow: Localized;
   tagline: Localized;
@@ -811,6 +900,9 @@ export interface LinkHubContent {
   primaryHref: string;
   exploreHeading: Localized;
   exploreItems: LinkHubItem[];
+  teamHeading: Localized;
+  teamIntro: Localized;
+  team: LinkHubTeamMember[];
   socialHeading: Localized;
   social: LinkHubSocialItem[];
   contactHeading: Localized;
@@ -842,6 +934,22 @@ function validateLinkHubContactItem(item: unknown, path: string, errors: Errors)
   return { ...base, display };
 }
 
+function validateLinkHubTeamMember(item: unknown, path: string, errors: Errors): LinkHubTeamMember {
+  const r = requireRecord(item, path, errors);
+  return {
+    id: validateItemId(r.id, `${path}.id`, errors),
+    name: requireLocalized(r.name, `${path}.name`, errors, { max: 80 }),
+    role: requireLocalized(r.role, `${path}.role`, errors, { min: 0, max: 80 }),
+    linkedinUrl: validateLinkedInProfileUrl(r.linkedinUrl, `${path}.linkedinUrl`, errors),
+    // Same rule as every other image in the CMS: an upload from the media
+    // library, or one of the site's own shipped assets. Never an external
+    // URL, so a profile photo cannot be hotlinked from — or tracked by — a
+    // third-party host.
+    image: validateImageRef(r.image, `${path}.image`, errors, false),
+    visible: typeof r.visible === 'boolean' ? r.visible : true,
+  };
+}
+
 function validateLinkHubSocialItem(item: unknown, path: string, errors: Errors): LinkHubSocialItem {
   const r = requireRecord(item, path, errors);
   const platform = oneOf(r.platform, SOCIAL_PLATFORM_KEYS, `${path}.platform`, errors);
@@ -853,7 +961,91 @@ function validateLinkHubSocialItem(item: unknown, path: string, errors: Errors):
   };
 }
 
-function validateLinkHub(body: unknown): ValidationResult<LinkHubContent> {
+/**
+ * What a section validator may need to know beyond its own payload.
+ *
+ * Only the link hub uses it: its contact rows must agree with the homepage's
+ * canonical contact details, which live in a different section. The route
+ * supplies these from the database (see routes/website-content.ts); a caller
+ * that passes no context gets per-section validation only.
+ */
+export interface ValidationContext {
+  canonicalContact?: { email: string; phone: string };
+}
+
+/** Digits only, leading zeros dropped — "0127 915 9200", "+201279159200" and
+ *  "tel:+20 127 915 9200" all reduce to a comparable national number. */
+function phoneDigits(value: string): string {
+  return value.replace(/\D/g, '').replace(/^0+/, '');
+}
+
+/**
+ * The same number written two ways: identical once reduced, or one is the
+ * other plus a country code in front ("+20" + "1279159200"). A floor of 7
+ * digits keeps a short fragment from "matching" the end of a real number.
+ */
+function samePhoneNumber(a: string, b: string): boolean {
+  const x = phoneDigits(a);
+  const y = phoneDigits(b);
+  if (x === '' || y === '') return false;
+  if (x === y) return true;
+  const [shorter, longer] = x.length < y.length ? [x, y] : [y, x];
+  return shorter.length >= 7 && longer.endsWith(shorter) && longer.length - shorter.length <= 3;
+}
+
+/**
+ * The link hub's contact rows must match the homepage's contact section.
+ *
+ * Two public pages giving two different numbers is worse than either being
+ * wrong on its own — a visitor cannot tell which to believe. This REFUSES a
+ * mismatch; it never copies one side onto the other, because silently
+ * rewriting an admin's input is exactly how a page ends up saying something
+ * nobody typed. The error names the field and both values, so the fix is
+ * obvious.
+ *
+ * Both the link (what gets dialled/mailed) and the shown value (what a
+ * visitor reads) are checked — a row whose label says one number and dials
+ * another is the worst version of the problem.
+ */
+function checkContactConsistency(
+  items: LinkHubContactItem[],
+  canonical: { email: string; phone: string },
+  errors: Errors,
+): void {
+  items.forEach((item, i) => {
+    const path = `linkHub.contactItems[${i}]`;
+    if (MAILTO_RE.test(item.href)) {
+      const address = item.href.slice('mailto:'.length);
+      if (address.toLowerCase() !== canonical.email.toLowerCase()) {
+        errors.add(
+          `${path}.href: "${address}" does not match the homepage contact email "${canonical.email}" `
+            + '(contact.email) — change one of them so both pages agree',
+        );
+      }
+      if (item.display !== '' && item.display.toLowerCase() !== canonical.email.toLowerCase()) {
+        errors.add(
+          `${path}.display: "${item.display}" does not match the homepage contact email "${canonical.email}" `
+            + '(contact.email)',
+        );
+      }
+    } else if (TEL_RE.test(item.href)) {
+      if (!samePhoneNumber(item.href.slice('tel:'.length), canonical.phone)) {
+        errors.add(
+          `${path}.href: "${item.href}" does not dial the homepage contact phone "${canonical.phone}" `
+            + '(contact.phone) — change one of them so both pages agree',
+        );
+      }
+      if (item.display !== '' && !samePhoneNumber(item.display, canonical.phone)) {
+        errors.add(
+          `${path}.display: "${item.display}" does not match the homepage contact phone "${canonical.phone}" `
+            + '(contact.phone)',
+        );
+      }
+    }
+  });
+}
+
+function validateLinkHub(body: unknown, context: ValidationContext = {}): ValidationResult<LinkHubContent> {
   const errors = new Errors();
   const r = requireRecord(body, 'linkHub', errors);
 
@@ -868,6 +1060,13 @@ function validateLinkHub(body: unknown): ValidationResult<LinkHubContent> {
 
     exploreHeading: requireLocalized(r.exploreHeading, 'linkHub.exploreHeading', errors, { max: 40 }),
     exploreItems: requireBoundedArray(r.exploreItems, 'linkHub.exploreItems', errors, 0, 8, validateLinkHubItem),
+
+    teamHeading: requireLocalized(r.teamHeading, 'linkHub.teamHeading', errors, { max: 40 }),
+    teamIntro: requireLocalized(r.teamIntro, 'linkHub.teamIntro', errors, { min: 0, max: 160 }),
+    // 0 is the honest default: no real member exists in this repository.
+    // 12 is where the list stops reading as a team and starts reading as a
+    // directory; the layout is tuned for 2-10.
+    team: requireBoundedArray(r.team, 'linkHub.team', errors, 0, 12, validateLinkHubTeamMember),
 
     socialHeading: requireLocalized(r.socialHeading, 'linkHub.socialHeading', errors, { max: 40 }),
     // Exactly one row per supported platform, always — the six rows are the
@@ -899,6 +1098,17 @@ function validateLinkHub(body: unknown): ValidationResult<LinkHubContent> {
   const duplicated = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
   for (const id of duplicated) errors.add(`linkHub has more than one row with the id "${id}"`);
 
+  // Member ids are their own namespace — a member called "email" is not a
+  // clash with the contact row of that id — but within the team they must be
+  // unique for the same reorder-safety reason.
+  const memberIds = value.team.map((m) => m.id).filter((id) => id !== '');
+  const duplicatedMembers = [...new Set(memberIds.filter((id, i) => memberIds.indexOf(id) !== i))];
+  for (const id of duplicatedMembers) errors.add(`linkHub.team has more than one member with the id "${id}"`);
+
+  if (context.canonicalContact !== undefined) {
+    checkContactConsistency(value.contactItems, context.canonicalContact, errors);
+  }
+
   // One row per platform, no platform twice — the fixed-tuple check above
   // only guarantees the count.
   const platforms = value.social.map((s) => s.platform);
@@ -914,7 +1124,7 @@ function validateLinkHub(body: unknown): ValidationResult<LinkHubContent> {
 /* dispatch                                                                  */
 /* ========================================================================= */
 
-const VALIDATORS: Record<SectionId, (body: unknown) => ValidationResult<unknown>> = {
+const VALIDATORS: Record<SectionId, (body: unknown, context: ValidationContext) => ValidationResult<unknown>> = {
   hero: validateHero,
   navigation: validateNavigation,
   problem: validateProblem,
@@ -934,6 +1144,67 @@ export function isSectionId(value: string): value is SectionId {
   return (SECTION_IDS as readonly string[]).includes(value);
 }
 
-export function validateWebsiteSection(section: SectionId, body: unknown): ValidationResult<unknown> {
-  return VALIDATORS[section](body);
+export function validateWebsiteSection(
+  section: SectionId,
+  body: unknown,
+  context: ValidationContext = {},
+): ValidationResult<unknown> {
+  return VALIDATORS[section](body, context);
+}
+
+/* ========================================================================= */
+/* seed upgrades for an already-populated database                           */
+/* ========================================================================= */
+
+/**
+ * Brings a stored section up to a newer seed WITHOUT touching admin edits.
+ *
+ * `seedWebsiteContentIfMissing` never writes to a section that already has
+ * rows, which is right for protecting edits but means a database seeded by an
+ * older release never receives a field added since — and the new validator
+ * would then refuse to re-save the old row. This fills that gap, per top-level
+ * key:
+ *
+ *   - key absent from the stored row  -> take the new seed's value
+ *   - stored value is byte-identical to the PREVIOUS seed's value for that
+ *     key (so provably never edited) -> take the new seed's value
+ *   - anything else                   -> keep what is stored, untouched
+ *
+ * Pure and idempotent: running it on its own output changes nothing, which is
+ * what makes it safe on every boot. Returns null when there is nothing to do.
+ */
+/** JSON with object keys sorted at every depth, so two values that differ only
+ *  in key order compare equal. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (isRecord(value)) {
+    return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson(value[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+export function upgradeSeededContent(
+  stored: unknown,
+  previousSeed: object,
+  nextSeed: object,
+): Record<string, unknown> | null {
+  if (!isRecord(stored)) return null;
+  const previous = previousSeed as Record<string, unknown>;
+  // Key order is not content. Postgres JSONB returns object keys in its own
+  // order ({"ar":…,"en":…}), so a plain JSON.stringify comparison would see
+  // every stored default as an edit and never upgrade anything.
+  const same = (a: unknown, b: unknown) => canonicalJson(a) === canonicalJson(b);
+
+  const out: Record<string, unknown> = { ...stored };
+  let changed = false;
+  for (const [key, next] of Object.entries(nextSeed)) {
+    if (!(key in stored)) {
+      out[key] = next;
+      changed = true;
+    } else if (key in previous && same(stored[key], previous[key]) && !same(stored[key], next)) {
+      out[key] = next;
+      changed = true;
+    }
+  }
+  return changed ? out : null;
 }

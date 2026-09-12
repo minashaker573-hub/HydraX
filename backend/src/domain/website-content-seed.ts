@@ -346,15 +346,17 @@ const settings: SiteSettingsContent = {
  * all, and specifically no HYDRAX LinkedIn, which does not exist.
  */
 const linkHub: LinkHubContent = {
-  eyebrow: en('Official links'),
+  // "SmartFarm Guardian" is the project's own name for itself (README.md's
+  // title), not new copy.
+  eyebrow: en('HYDRAX / SmartFarm Guardian'),
   tagline: en('Water that lets every field thrive.'),
-  intro: en('Soil-based irrigation control that runs on the farm, not in the cloud.'),
+  intro: en('The official link hub for the HYDRAX project and the team building it.'),
 
   primaryLabel: en('Visit the HYDRAX website'),
   primaryNote: en('What the system is, how it works, and what it deliberately does not do'),
   primaryHref: '/',
 
-  exploreHeading: en('Explore'),
+  exploreHeading: en('HYDRAX links'),
   exploreItems: [
     {
       id: 'request',
@@ -371,6 +373,14 @@ const linkHub: LinkHubContent = {
       visible: true,
     },
   ],
+
+  teamHeading: en('Meet the team'),
+  teamIntro: en('The people designing and building HYDRAX.'),
+  // Empty on purpose. No team member's name, role or LinkedIn profile exists
+  // anywhere in this repository, and inventing one — even as a placeholder —
+  // risks it being published. The section renders nothing until an admin adds
+  // a real person through the CMS.
+  team: [],
 
   socialHeading: en('Follow'),
   social: [
@@ -409,6 +419,21 @@ const linkHub: LinkHubContent = {
     { label: en('Privacy'), href: '/privacy', visible: true },
     { label: en('Terms'), href: '/terms', visible: true },
   ],
+};
+
+/**
+ * The link hub values the FIRST release seeded, for keys this release changed.
+ *
+ * Used only by `upgradeSeededContent` at boot: a stored value still byte-equal
+ * to one of these was never edited, so it is safe to move to the new seed; a
+ * value that differs is an admin's edit and is left exactly as it is. Keys the
+ * first release never had (the team fields) need no entry — absent keys are
+ * always filled in.
+ */
+export const LINKHUB_SEED_V1: Partial<Record<keyof LinkHubContent, unknown>> = {
+  eyebrow: en('Official links'),
+  intro: en('Soil-based irrigation control that runs on the farm, not in the cloud.'),
+  exploreHeading: en('Explore'),
 };
 
 // Deliberately not annotated as `Record<SectionId, unknown>`: that would

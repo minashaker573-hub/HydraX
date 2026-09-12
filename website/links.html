@@ -2,199 +2,202 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>HYDRAX — Official Links</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>HYDRAX — Official Links &amp; Team</title>
     <meta
       name="description"
-      content="The official HYDRAX link hub: the HYDRAX website, the live monitoring dashboard, how to request a system, and how to reach us."
+      content="The official HYDRAX link hub: the project website, the live monitoring dashboard, how to request a system, the team building it, and how to reach us."
     />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#13281c" />
 
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="HYDRAX — Official Links" />
+    <meta property="og:site_name" content="HYDRAX" />
+    <meta property="og:title" content="HYDRAX — Official Links &amp; Team" />
     <meta
       property="og:description"
-      content="Soil-based irrigation control that runs on the farm, not in the cloud. Every official HYDRAX link in one place."
+      content="The official link hub for the HYDRAX SmartFarm Guardian project and the team building it."
     />
     <meta property="og:image" content="/og-image.svg" />
     <meta property="og:image:type" content="image/svg+xml" />
     <!--
-      TODO (project owner): same limitation as index.html — og:image and
-      og:url only unfurl reliably as absolute URLs, and this repository still
-      defines no production domain. This page is the one most likely to be
-      unfurled (it is the URL that goes in a social bio), so when a domain
-      exists, do it here first:
+      TODO (project owner): og:image and og:url only unfurl reliably as
+      absolute URLs, and this repository still defines no production domain.
+      This is the page most likely to be unfurled (it goes in social bios), so
+      when a domain exists, do it here first:
         1. add <meta property="og:url" content="https://YOUR-DOMAIN/links" />
         2. point og:image at an absolute URL on that domain
         3. export a 1200x630 PNG of assets/logo.jpeg — several platforms will
            not render an SVG preview at all.
     -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="HYDRAX — Official Links" />
+    <meta name="twitter:title" content="HYDRAX — Official Links &amp; Team" />
     <meta
       name="twitter:description"
-      content="Soil-based irrigation control that runs on the farm, not in the cloud."
+      content="The official link hub for the HYDRAX SmartFarm Guardian project and the team building it."
     />
     <meta name="twitter:image" content="/og-image.svg" />
     <link rel="canonical" href="/links" />
 
-    <!-- The site stylesheet is the brand: tokens, type scale, buttons, focus
-         ring and footer all come from it unchanged. links.css only adds the
-         rules this page needs and overrides nothing in it. -->
+    <!-- styles.css supplies the brand tokens, type families and the skip link.
+         links.css defines this page with its own `lh-` classes and changes
+         nothing shared. -->
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/links.css" />
     <link rel="icon" href="/assets/logo.jpeg" />
   </head>
 
-  <body class="linkhub-body">
+  <body class="lh-body">
     <a class="skip-link" href="#main">Skip to content</a>
 
-    <!-- No site nav here on purpose: this page is opened from a social bio,
-         where a nav bar duplicating the links below is noise. The language
-         toggle stays, so a choice made on the homepage still applies. -->
-    <div class="linkhub-topbar">
-      <div class="lang-toggle" id="lang-toggle" role="group" aria-label="Language">
-        <button class="lang-btn" type="button" data-lang="en">EN</button>
-        <button class="lang-btn" type="button" data-lang="ar">AR</button>
-      </div>
-    </div>
+    <!--
+      Everything below is a complete page on its own: what a visitor with
+      JavaScript blocked sees and what an unfurl crawler reads. It mirrors
+      js/links-config.js exactly (website/check.mjs fails if the two drift).
+      js/links.js re-renders from published CMS content, the runtime source.
+    -->
+    <main id="main" class="lh">
+      <div class="lh-column">
 
-    <main id="main" class="linkhub">
-      <div class="linkhub-inner">
-        <!-- ==================================================== identity -->
-        <header class="linkhub-head">
-          <img
-            class="linkhub-mark"
-            src="/assets/logo.jpeg"
-            alt="HYDRAX"
-            width="112" height="112"
-          />
-          <h1 class="linkhub-wordmark">HYDRAX</h1>
-          <p class="eyebrow linkhub-eyebrow" id="linkhub-eyebrow">Official links</p>
-          <p class="linkhub-tagline" id="linkhub-tagline">Water that lets every field thrive.</p>
-          <p class="linkhub-sub" id="linkhub-intro">
-            Soil-based irrigation control that runs on the farm, not in the cloud.
-          </p>
+        <!-- ====================================================== profile -->
+        <header class="lh-profile lh-anim">
+          <div class="lang-toggle lh-lang" id="lang-toggle" role="group" aria-label="Language">
+            <button class="lang-btn" type="button" data-lang="en">EN</button>
+            <button class="lang-btn" type="button" data-lang="ar">AR</button>
+          </div>
+
+          <a class="lh-logo" href="/" aria-label="HYDRAX home">
+            <img src="/assets/logo.jpeg" alt="" width="84" height="84" />
+          </a>
+          <h1 class="lh-name">HYDRAX</h1>
+          <p class="lh-eyebrow" id="linkhub-eyebrow">HYDRAX / SmartFarm Guardian</p>
+          <p class="lh-tagline" id="linkhub-tagline">Water that lets every field thrive.</p>
+          <p class="lh-intro" id="linkhub-intro">The official link hub for the HYDRAX project and the team building it.</p>
         </header>
 
-        <svg class="field-line linkhub-divider" viewBox="0 0 1180 28" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M0 20 C 300 4, 700 32, 1180 10" />
-        </svg>
+        <!-- ================================================= HYDRAX links -->
+        <section class="lh-group" id="linkhub-projects-section" aria-labelledby="linkhub-projects-h">
+          <h2 class="lh-group-h" id="linkhub-projects-h">HYDRAX links</h2>
 
-        <!--
-          ==================================================== the link list
+          <ul class="lh-stack">
+            <li class="lh-anim">
+              <a class="lh-link lh-link-featured" id="linkhub-primary" href="/">
+                <span class="lh-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3.6 9h16.8M3.6 15h16.8M12 3c2.5 2.4 3.8 5.5 3.8 9s-1.3 6.6-3.8 9c-2.5-2.4-3.8-5.5-3.8-9S9.5 5.4 12 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+                <span class="lh-text">
+                  <span class="lh-title lh-cta-label">Visit the HYDRAX website</span>
+                  <span class="lh-sub" id="linkhub-primary-note">What the system is, how it works, and what it deliberately does not do</span>
+                </span>
+                <span class="lh-go">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h13m-5.5-5.5L18 12l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+              </a>
+            </li>
+          </ul>
 
-          Every anchor below is also in js/links-config.js, which is the file
-          to edit when a URL changes; js/links.js re-renders these containers
-          from it on load. This markup is what a visitor gets with JavaScript
-          blocked or still loading, and what a preview crawler reads — so it
-          is kept complete and in sync, and check.mjs fails if it drifts.
-        -->
+          <ul class="lh-stack" id="linkhub-projects">
+            <li class="lh-anim">
+              <a class="lh-link" href="/request">
+                <span class="lh-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1zM8 5H6.5A1.5 1.5 0 0 0 5 6.5v13A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 17.5 5H16M8.5 11h7M8.5 15h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+                <span class="lh-text">
+                  <span class="lh-title">Request a HYDRAX System</span>
+                  <span class="lh-sub">Tell us about your farm — no account, no payment, no obligation</span>
+                </span>
+                <span class="lh-go">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h13m-5.5-5.5L18 12l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+              </a>
+            </li>
+            <li class="lh-anim">
+              <a class="lh-link" href="/dashboard">
+                <span class="lh-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v11H4zM8 20h8M12 16v4M7.5 12.5l2.5-3 2.5 2 3.5-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+                <span class="lh-text">
+                  <span class="lh-title">Live monitoring dashboard</span>
+                  <span class="lh-sub">Soil moisture, irrigation state, pump health, alerts</span>
+                </span>
+                <span class="lh-go">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h13m-5.5-5.5L18 12l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+              </a>
+            </li>
+          </ul>
+        </section>
 
-        <!-- --------------------------------------------- primary CTA -->
-        <a class="btn btn-primary btn-lg linkhub-cta" id="linkhub-primary" href="/">
-          <span class="linkhub-cta-label">Visit the HYDRAX website</span>
-        </a>
-        <p class="linkhub-cta-note" id="linkhub-primary-note">
-          What the system is, how it works, and what it deliberately does not do
-        </p>
+        <!-- ================================================ meet the team
+             Ships hidden and empty: no team member's name, role or LinkedIn
+             profile exists anywhere in this repository, and none is invented.
+             js/links.js reveals this section once a published member exists. -->
+        <section class="lh-group" id="linkhub-team-section" aria-labelledby="linkhub-team-h" hidden>
+          <h2 class="lh-group-h" id="linkhub-team-h">Meet the team</h2>
+          <p class="lh-group-intro" id="linkhub-team-intro">The people designing and building HYDRAX.</p>
+          <ul class="lh-stack" id="linkhub-team"></ul>
+        </section>
 
-        <!-- --------------------------------------------- project links -->
-        <section class="linkhub-section" id="linkhub-projects-section" aria-labelledby="linkhub-projects-h">
-          <h2 class="linkhub-section-h" id="linkhub-projects-h">Explore</h2>
-          <nav class="linkhub-list" id="linkhub-projects" aria-labelledby="linkhub-projects-h">
-            <a class="linkhub-row" href="/request">
-              <span class="linkhub-row-body">
-                <span class="linkhub-row-label">Request a HYDRAX System</span>
-                <span class="linkhub-row-note">Tell us about your farm — no account, no payment, no obligation</span>
-              </span>
-              <svg class="linkhub-row-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M5 12h13m-5.5-5.5L18 12l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </a>
-            <a class="linkhub-row" href="/dashboard">
-              <span class="linkhub-row-body">
-                <span class="linkhub-row-label">Live monitoring dashboard</span>
-                <span class="linkhub-row-note">Soil moisture, irrigation state, pump health, alerts</span>
-              </span>
-              <svg class="linkhub-row-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M5 12h13m-5.5-5.5L18 12l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </a>
+        <!-- ================================================ follow
+             Hidden and empty: HYDRAX has no social account yet — and
+             specifically no HYDRAX LinkedIn page. A member's own LinkedIn
+             belongs in "Meet the team", never here. -->
+        <section class="lh-group" id="linkhub-social-section" aria-labelledby="linkhub-social-h" hidden>
+          <h2 class="lh-group-h" id="linkhub-social-h">Follow</h2>
+          <ul class="lh-stack" id="linkhub-social"></ul>
+        </section>
+
+        <!-- ================================================ contact -->
+        <section class="lh-group" id="linkhub-contact-section" aria-labelledby="linkhub-contact-h">
+          <h2 class="lh-group-h" id="linkhub-contact-h">Contact</h2>
+          <ul class="lh-stack" id="linkhub-contact">
+            <li class="lh-anim">
+              <a class="lh-contact-link" href="mailto:ingeniummteam@email.com">
+                <span class="lh-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 6.5h17v11h-17zM3.5 7l8.5 6 8.5-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+                <span class="lh-text">
+                  <span class="lh-title">Email us</span>
+                  <span class="lh-sub lh-contact-value">ingeniummteam@email.com</span>
+                </span>
+                <span class="lh-go">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h13m-5.5-5.5L18 12l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+              </a>
+            </li>
+            <li class="lh-anim">
+              <a class="lh-contact-link" href="tel:+201279159200">
+                <span class="lh-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5H4.5A1.5 1.5 0 0 0 3 5c0 8.8 7.2 16 16 16a1.5 1.5 0 0 0 1.5-1.5V17l-4.2-1.6-2.1 2.4a13.6 13.6 0 0 1-6-6l2.4-2.1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+                <span class="lh-text">
+                  <span class="lh-title">Call us</span>
+                  <span class="lh-sub lh-contact-value">0127 915 9200</span>
+                </span>
+                <span class="lh-go">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h13m-5.5-5.5L18 12l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+              </a>
+            </li>
+          </ul>
+        </section>
+
+        <!-- ====================================================== footer -->
+        <footer class="lh-footer lh-anim">
+          <p class="lh-location">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            <span class="sr-only" id="linkhub-location-label">Based in</span>
+            <span id="linkhub-location">Mansoura, Egypt</span>
+          </p>
+          <nav class="lh-footer-links" id="linkhub-footer-links" aria-label="Footer">
+            <a href="/">Home</a>
+            <a href="/request">Request a System</a>
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
           </nav>
-        </section>
-
-        <!--
-          --------------------------------------------- social accounts
-
-          Deliberately absent. HYDRAX has no LinkedIn page, Instagram,
-          Facebook, YouTube, TikTok or X account, so there is no row for one
-          — including no "Team LinkedIn", whose URL exists nowhere in this
-          repository. js/links.js removes this whole section while
-          links-config.js lists no real profile URL, and restores it the
-          moment one is added there. A dead link in a bio costs more than an
-          absent row.
-        -->
-        <section class="linkhub-section" id="linkhub-social-section" aria-labelledby="linkhub-social-h" hidden>
-          <h2 class="linkhub-section-h" id="linkhub-social-h">Follow</h2>
-          <nav class="linkhub-list" id="linkhub-social" aria-labelledby="linkhub-social-h"></nav>
-        </section>
-
-        <!-- --------------------------------------------- contact -->
-        <section class="linkhub-section" id="linkhub-contact-section" aria-labelledby="linkhub-contact-h">
-          <h2 class="linkhub-section-h" id="linkhub-contact-h">Contact</h2>
-          <nav class="linkhub-list" id="linkhub-contact" aria-labelledby="linkhub-contact-h">
-            <a class="linkhub-row" href="mailto:ingeniummteam@email.com">
-              <span class="linkhub-row-icon">
-                <svg class="linkhub-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M3 6.5h18v11H3zM3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </span>
-              <span class="linkhub-row-body">
-                <span class="linkhub-row-label">Email us</span>
-                <span class="linkhub-row-value">ingeniummteam@email.com</span>
-              </span>
-              <svg class="linkhub-row-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M5 12h13m-5.5-5.5L18 12l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </a>
-            <a class="linkhub-row" href="tel:+201279159200">
-              <span class="linkhub-row-icon">
-                <svg class="linkhub-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M7 3.5H4.5A1.5 1.5 0 0 0 3 5c0 8.8 7.2 16 16 16a1.5 1.5 0 0 0 1.5-1.5V17l-4.2-1.6-2.1 2.4a13.6 13.6 0 0 1-6-6l2.4-2.1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </span>
-              <span class="linkhub-row-body">
-                <span class="linkhub-row-label">Call us</span>
-                <span class="linkhub-row-value">0127 915 9200</span>
-              </span>
-              <svg class="linkhub-row-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M5 12h13m-5.5-5.5L18 12l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </a>
-          </nav>
-          <p class="linkhub-location" id="linkhub-location">Mansoura, Egypt</p>
-        </section>
+        </footer>
       </div>
     </main>
-
-    <footer class="footer linkhub-footer">
-      <div class="container footer-inner">
-        <div class="footer-brand">
-          <img class="brand-mark-img" src="/assets/logo.jpeg" alt="" aria-hidden="true" />
-          <div>
-            <p class="footer-brand-name">HYDRAX</p>
-            <p class="footer-tag">Water that lets every field thrive.</p>
-          </div>
-        </div>
-        <nav class="footer-links" id="linkhub-footer-links" aria-label="Footer">
-          <a href="/">Home</a>
-          <a href="/request">Request a System</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/terms">Terms</a>
-        </nav>
-      </div>
-    </footer>
 
     <script type="module" src="/js/links.js"></script>
   </body>

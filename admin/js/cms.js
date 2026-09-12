@@ -381,29 +381,28 @@ const SECTION_SCHEMA = {
     { key: 'defaultCtaHref', label: 'Default CTA link', kind: 'href' },
     { key: 'stickyCtaText', label: 'Mobile sticky-bar headline', kind: 'localized', maxLen: 160 },
   ],
-  // The /links link hub. Grouped to match the page top to bottom: identity,
-  // the one primary CTA, then each category of rows. Bounds transcribed from
-  // validateLinkHub in domain/website-content.ts.
+  // The /links link hub. Groups follow the page top to bottom. Bounds are
+  // transcribed from validateLinkHub in domain/website-content.ts; the server
+  // re-checks every value regardless.
   linkHub: [
     { key: 'eyebrow', label: 'Eyebrow', kind: 'localized', maxLen: 60, group: 'General' },
     { key: 'tagline', label: 'Tagline', kind: 'localized', maxLen: 100, group: 'General' },
-    { key: 'intro', label: 'Intro line', kind: 'localized', maxLen: 200, textarea: true, group: 'General' },
+    { key: 'intro', label: 'Supporting sentence', kind: 'localized', maxLen: 200, textarea: true, group: 'General' },
     { key: 'location', label: 'Location', kind: 'localized', maxLen: 80, group: 'General' },
 
-    { key: 'primaryLabel', label: 'Button label', kind: 'localized', maxLen: 60, group: 'Primary CTA' },
+    { key: 'primaryLabel', label: 'Main button label', kind: 'localized', maxLen: 60, group: 'Primary links' },
     {
-      key: 'primaryHref', label: 'Button link', kind: 'href',
-      options: LINKHUB_HREF_OPTIONS, group: 'Primary CTA',
+      key: 'primaryHref', label: 'Main button link', kind: 'href',
+      options: LINKHUB_HREF_OPTIONS, group: 'Primary links',
     },
     {
-      key: 'primaryNote', label: 'Supporting line under the button', kind: 'localized',
-      maxLen: 140, textarea: true, group: 'Primary CTA',
+      key: 'primaryNote', label: 'Line under the main button', kind: 'localized',
+      maxLen: 140, textarea: true, group: 'Primary links',
     },
-
-    { key: 'exploreHeading', label: 'Section heading', kind: 'localized', maxLen: 40, group: 'Explore' },
+    { key: 'exploreHeading', label: 'Section heading', kind: 'localized', maxLen: 40, group: 'Primary links' },
     {
-      key: 'exploreItems', label: 'Explore links', kind: 'objectList', min: 0, max: 8,
-      itemLabel: 'link', group: 'Explore',
+      key: 'exploreItems', label: 'Links', kind: 'objectList', min: 0, max: 8,
+      itemLabel: 'link', group: 'Primary links',
       itemFields: [
         { key: 'id', label: 'ID', kind: 'id' },
         { key: 'label', label: 'Label', kind: 'localized', maxLen: 60 },
@@ -413,27 +412,60 @@ const SECTION_SCHEMA = {
       ],
     },
 
-    { key: 'contactHeading', label: 'Section heading', kind: 'localized', maxLen: 40, group: 'Contact' },
+    { key: 'teamHeading', label: 'Section heading', kind: 'localized', maxLen: 40, group: 'Team members' },
     {
-      key: 'contactItems', label: 'Contact rows', kind: 'objectList', min: 0, max: 4,
-      itemLabel: 'contact row', group: 'Contact',
+      key: 'teamIntro', label: 'Section intro (optional)', kind: 'localized', maxLen: 160,
+      textarea: true, group: 'Team members',
+    },
+    {
+      // Starts empty: no real member exists in this repository, and none is
+      // invented. The section stays off /links until a real person is added
+      // AND published. A new row with no name cannot be saved (the server
+      // requires one), so an accidental "Add member" can never go live blank.
+      key: 'team', label: 'Members', kind: 'objectList', min: 0, max: 12,
+      itemLabel: 'member', group: 'Team members',
+      hint: "A member's LinkedIn is that person's own profile. It is not a HYDRAX account — HYDRAX has no LinkedIn page.",
       itemFields: [
         { key: 'id', label: 'ID', kind: 'id' },
-        { key: 'label', label: 'Label', kind: 'localized', maxLen: 60 },
+        { key: 'name', label: 'Name', kind: 'localized', maxLen: 80 },
+        { key: 'role', label: 'Role (optional)', kind: 'localized', maxLen: 80 },
         {
-          key: 'href', label: 'Link', kind: 'text', maxLen: 200,
-          hint: 'Must be mailto:someone@example.com or tel:+20... - nothing else is accepted.',
+          key: 'linkedinUrl', label: 'LinkedIn profile URL (optional)', kind: 'profileUrl', maxLen: 300,
+          placeholder: 'https://www.linkedin.com/in/…',
+          hint: 'Paste the profile link exactly as LinkedIn shows it. Must be https on linkedin.com or '
+            + 'www.linkedin.com and point at a profile. Leave empty if the person has no public profile.',
         },
         {
-          key: 'display', label: 'Shown value', kind: 'text', maxLen: 120,
-          hint: 'What a visitor reads, e.g. the number in local-dial form. Always rendered left-to-right, including in Arabic.',
+          key: 'image', label: 'Profile photo (optional)', kind: 'image', optional: true,
+          noneLabel: '(none — show initials)',
         },
         { key: 'visible', label: 'Shown on page', kind: 'boolean' },
       ],
     },
 
     { key: 'socialHeading', label: 'Section heading', kind: 'localized', maxLen: 40, group: 'Social accounts' },
-    { key: 'social', label: 'Social accounts', kind: 'socialList', group: 'Social accounts' },
+    { key: 'social', label: 'HYDRAX social accounts', kind: 'socialList', group: 'Social accounts' },
+
+    { key: 'contactHeading', label: 'Section heading', kind: 'localized', maxLen: 40, group: 'Contact' },
+    {
+      key: 'contactItems', label: 'Contact rows', kind: 'objectList', min: 0, max: 4,
+      itemLabel: 'contact row', group: 'Contact',
+      hint: 'Email and phone must match the homepage contact section (Final CTA / contact). '
+        + 'A mismatch is refused on save — change both together.',
+      itemFields: [
+        { key: 'id', label: 'ID', kind: 'id' },
+        { key: 'label', label: 'Label', kind: 'localized', maxLen: 60 },
+        {
+          key: 'href', label: 'Link', kind: 'text', maxLen: 200,
+          hint: 'mailto:someone@example.com or tel:+20… — nothing else is accepted.',
+        },
+        {
+          key: 'display', label: 'Shown value', kind: 'text', maxLen: 120,
+          hint: 'What a visitor reads, e.g. the number in local-dial form. Always shown left-to-right, including in Arabic.',
+        },
+        { key: 'visible', label: 'Shown on page', kind: 'boolean' },
+      ],
+    },
 
     {
       key: 'footerLinks', label: 'Footer links', kind: 'objectList', min: 1, max: 8,
@@ -651,7 +683,7 @@ function buildImagePicker(obj, desc) {
   syncPreview();
 
   const options = [
-    ...(desc.optional ? [{ value: '', label: '(none — use the site default)' }] : []),
+    ...(desc.optional ? [{ value: '', label: desc.noneLabel ?? '(none — use the site default)' }] : []),
     ...SEED_IMAGES,
     ...(mediaCache || []).map((media) => ({ value: media.url, label: `Uploaded — ${media.original_name}` })),
   ];
@@ -785,6 +817,20 @@ function buildField(obj, desc) {
     }
     case 'socialList':
       return buildSocialList(obj, desc);
+    case 'profileUrl': {
+      // Sent exactly as typed — no trimming or "fixing". The server either
+      // accepts the URL as-is or refuses it with a reason naming the rule.
+      const input = document.createElement('input');
+      input.type = 'url';
+      input.value = obj[desc.key] ?? '';
+      if (desc.maxLen) input.maxLength = desc.maxLen;
+      if (desc.placeholder) input.placeholder = desc.placeholder;
+      input.spellcheck = false;
+      input.autocomplete = 'off';
+      input.addEventListener('input', () => { obj[desc.key] = input.value; });
+      wrap.appendChild(input);
+      break;
+    }
     case 'image':
       wrap.appendChild(buildImagePicker(obj, desc));
       break;
@@ -897,7 +943,9 @@ function buildSocialList(obj, desc) {
     input.maxLength = 300;
     input.placeholder = `https://${platform.domain}/...`;
     input.addEventListener('input', () => {
-      item.url = input.value.trim();
+      // As typed — the server refuses surrounding spaces rather than this
+      // editor quietly removing them.
+      item.url = input.value;
       syncState();
     });
     urlField.appendChild(input);
@@ -1013,6 +1061,7 @@ function buildArrayField(obj, desc) {
     wrap.appendChild(addBtn);
   }
 
+  if (desc.hint) wrap.appendChild(el('span', 'field-hint', desc.hint));
   wrap.appendChild(el(
     'span', 'field-hint',
     desc.fixed
@@ -1111,8 +1160,11 @@ async function renderContentEditor(id) {
     clearEditorMessage();
     try {
       await putDraft(id, workingDraft);
-      showEditorMessage('Draft saved.', 'ok');
+      // Re-render first, then confirm: renderContentEditor builds a fresh,
+      // hidden message box, so a message shown before it was wiped instantly
+      // and an admin never saw that the save had worked.
       await renderContentEditor(id);
+      showEditorMessage('Draft saved.', 'ok');
     } catch (error) {
       if (error instanceof Error && error.message === 'unauthorized') return;
       showEditorMessage(formatApiError(error), 'error');
@@ -1129,8 +1181,8 @@ async function renderContentEditor(id) {
     try {
       await putDraft(id, workingDraft);
       await postPublish(id);
-      showEditorMessage('Saved and published — now live on the public site.', 'ok');
       await renderContentEditor(id);
+      showEditorMessage('Saved and published — now live on the public site.', 'ok');
     } catch (error) {
       if (error instanceof Error && error.message === 'unauthorized') return;
       showEditorMessage(formatApiError(error), 'error');

@@ -137,10 +137,10 @@ deliberately minimal port of the dashboard's API shape (`getLang`, `setLang`,
 
 **Validation, not sanitization.** Nothing free-form is trusted:
 
-- `validateLinkHubHref` / `validateSocialUrl` — the `/links` allowlist: real
-  routes on this site and `mailto:`/`tel:` for destinations, and for a social
-  profile `https:` on that platform's own domain and nowhere else. See the
-  `links.html` row of §6.
+- `validateLinkHubHref` / `validatePinnedHttpsUrl` — the `/links` allowlist:
+  real routes and `mailto:`/`tel:` for destinations; `https:` on a pinned host
+  for social accounts and team members' LinkedIn profiles. See the
+  `links.html` part of §6.
 - `validateHref` — an href may only be one of the page's real in-page
   anchors, a real internal route, `mailto:`, or `tel:`. No external domain,
   no `javascript:`/`data:` scheme.
@@ -334,69 +334,95 @@ against the actual current markup, not assumed from an earlier pass.
 
 ### `links.html` (the link hub at `/links`)
 
-The one page besides the homepage that is CMS-driven. It is its own page, so
-it is its own section (`linkHub`) rather than homepage content — the same
-reasoning that keeps privacy/terms out of the reorderable set.
+The official project and team page — the URL that goes in social bios. It is
+its own page, so it is its own section (`linkHub`), edited at
+**/admin → Website content → Link Hub**.
 
-Adding this section needed **no schema migration**: `website_content.section`
-is plain `TEXT` with no enum constraint, and `server.ts` already seeds every
-id in `SECTION_IDS` on every boot via `seedWebsiteContentIfMissing`, which is
-a no-op once a row exists. An existing database picks the section up on its
-next restart with the seeded defaults, and an admin's later edits are never
-overwritten.
+**Architecture — one authoring source.**
+
+```
+CMS published linkHub  ──►  runtime /links         (js/links.js)
+js/links-config.js     ──►  offline fallback + first-boot seed only
+```
+
+`links-config.js` holds `LINK_HUB_FALLBACK` in exactly the CMS section shape,
+so the page has one render pipeline no matter where content came from:
+`js/links-model.js` (pure — decides what renders) → `js/links.js` (draws it).
+Editing `links-config.js` does not change what visitors see.
+
+**No schema migration.** `website_content.section` is plain `TEXT`, and
+`server.ts` seeds every section id on boot (`ON CONFLICT DO NOTHING`).
+
+**Upgrading a database seeded by the first link hub release.** Rows written
+before team members existed lack the team fields and would fail validation on
+re-save. At boot, `server.ts` runs `upgradeSeededContent` over the stored
+draft and published rows, per top-level key: a missing key is filled from the
+current seed; a value byte-identical to the previous seed (`LINKHUB_SEED_V1`,
+so provably never edited) moves to the new default; anything else — any admin
+edit — is left exactly as it is. Idempotent: a current database is a no-op.
 
 | Content element | Admin editable? | Intentionally code-controlled? |
 | --- | --- | --- |
-| Logo / identity image | | Yes — the page uses `/assets/logo.jpeg` directly; `settings.logo` does not reach it (same limitation as request/privacy/terms, §7) |
+| Logo / identity image | | Yes — `/assets/logo.jpeg`; `settings.logo` does not reach this page (§7) |
 | "HYDRAX" wordmark | | Yes — the product name |
-| Eyebrow, tagline, intro line, location | Yes — `linkHub.eyebrow`, `.tagline`, `.intro`, `.location` | |
-| Primary CTA: label, link, supporting line | Yes — `linkHub.primaryLabel`, `.primaryHref`, `.primaryNote` | Rendered as the single filled button; that it is *the* primary action is a layout decision, not content |
-| Explore: heading + 0–8 rows (label, supporting line, link, show/hide, reorder) | Yes — `linkHub.exploreHeading`, `.exploreItems` | |
-| Contact: heading + 0–4 rows (label, `mailto:`/`tel:` link, shown value, show/hide, reorder) | Yes — `linkHub.contactHeading`, `.contactItems` | The envelope/handset icon follows the link's scheme rather than being selectable — a `tel:` row cannot be given an envelope |
-| Social: heading + one row per supported platform (label, profile URL, show/hide) | Yes — `linkHub.socialHeading`, `.social` | The *set* of six platforms is fixed: a seventh needs an icon drawn and a domain allowlisted, so it is a code change |
-| Footer: 1–8 links (label, href, show/hide, reorder) | Yes — `linkHub.footerLinks` | |
-| Row icons, arrows, hairline rules, focus ring | | Yes — design system |
-| Page `<title>`, meta description, OG tags | | Yes — static in `links.html`; `seo.*` drives the homepage only |
-| Skip-to-content link, language toggle | | Yes — chrome |
+| Eyebrow, tagline, supporting sentence, location | Yes — `linkHub.eyebrow`, `.tagline`, `.intro`, `.location` | "Based in" label is UI chrome (EN/AR) |
+| Main button: label, link, line under it | Yes — `linkHub.primaryLabel`, `.primaryHref`, `.primaryNote` | It is the page's only filled button — a layout decision |
+| Primary links: heading + 0–8 rows (label, supporting line, link, show/hide, reorder) | Yes — `linkHub.exploreHeading`, `.exploreItems` | |
+| **Team: heading, intro + 0–12 members** (name EN/AR, role EN/AR, LinkedIn profile URL, photo, show/hide, reorder, add, delete) | Yes — `linkHub.teamHeading`, `.teamIntro`, `.team` | Member numbering and the initials mark are derived, not stored |
+| Social: heading + one row per supported platform (label, URL, show/hide) | Yes — `linkHub.socialHeading`, `.social` | The six-platform set is code (icon + domain allowlist) |
+| Contact: heading + 0–4 rows (label, `mailto:`/`tel:` link, shown value, show/hide) | Yes — `linkHub.contactHeading`, `.contactItems` | Must agree with `contact.email`/`contact.phone` (below); icon follows the scheme |
+| Footer: 1–8 links | Yes — `linkHub.footerLinks` | |
+| Section numbers (01, 02 …), crop marks, rules, icons, focus ring | | Yes — design system; numbers close up when a section is empty |
+| `<title>`, meta description, OG tags | | Yes — static in `links.html`; `seo.*` drives the homepage only |
 
-**No social account is ever invented.** All six platforms ship with an empty
-URL, which is a statement that the account does not exist, not a placeholder.
-An empty URL renders no row, and if that leaves the section empty the heading
-is dropped with it rather than left standing over nothing. There is no HYDRAX
-LinkedIn page; the LinkedIn row exists so a *real* team profile URL can be
-pasted in later, and stays empty until one is.
+**Team members.** The seed ships **zero** members: no name, role or profile
+for the team exists in this repository, and none is invented. The section is
+absent from the page until a real, visible, named member is published. Each
+member's LinkedIn is that person's profile and lives in "Meet the team" — it is
+not a HYDRAX account, and HYDRAX has no LinkedIn page. A member without a photo
+gets an initials mark; without a LinkedIn URL, no action is shown.
 
-**A social URL is pinned to its platform.** `validateSocialUrl` requires
-`https:` and a hostname equal to (or a subdomain of) that platform's own
-domain, so a row labelled LinkedIn cannot point at `example.com`, and
-lookalikes like `linkedin.com.evil.example` are refused. URLs are never
-rewritten — an admin's URL is accepted exactly as typed or refused with a
-reason naming the required domain.
+**URL rules** (`validatePinnedHttpsUrl` in `domain/website-content.ts`, shared
+by social and member profiles; never rewritten — accepted as typed or refused
+with a reason):
 
-**`/links` has its own href allowlist.** `validateLinkHubHref` accepts only
-real routes on this site plus `mailto:`/`tel:` — deliberately *not*
-`validateHref`, which also permits the homepage's in-page anchors (`#how`,
-`#contact`, …). Those sections do not exist on `/links`, so an anchor would
-save cleanly and then scroll nowhere.
+- Refused everywhere: unparseable URLs, surrounding spaces, any scheme but
+  `https:`, embedded credentials, explicit ports, and any host outside the
+  allowlist (matched on the parsed hostname, so `linkedin.com.evil.example`
+  fails).
+- Member LinkedIn: exactly `linkedin.com` or `www.linkedin.com`, with a
+  profile path (the bare front page is refused).
+- Social account: that platform's domain or a subdomain of it.
+- Link destinations: `validateLinkHubHref` — real routes on this site plus
+  `mailto:`/`tel:`; not the homepage's in-page anchors, which do not exist on
+  `/links`. Footer links use the site-wide `validateHref`, so `/#contact` is
+  fine there.
+- Member photos: `validateImageRef` — a CMS media-library upload or a shipped
+  site asset. Never an external or `data:` URL.
 
-**Three surfaces, kept in agreement by checks.** `links.html`'s markup is the
-no-JS fallback (and what an unfurl crawler reads), `js/links-config.js` is the
-offline default and the source the seed was transcribed from, and published
-CMS content is the runtime source. Drift between them is caught, not trusted
-to memory:
+**Contact consistency.** On save and again on publish, the route passes the
+homepage's canonical contact details (the **published** `contact` section,
+falling back to its draft, then the seed) into validation. A `mailto:` row
+must use `contact.email` (case-insensitive); a `tel:` row must dial
+`contact.phone` — compared as digits, so the local display form and the
+international dial form of the same number match, but a different number or a
+short fragment does not. The shown value is checked too. A mismatch is
+**refused with the field named**; neither side is ever synchronized onto the
+other. Consequence: after changing the homepage contact, a link hub draft that
+still has the old value cannot be published until it is updated too.
 
-- `links-config.js` ↔ `links.html` — `website/check.mjs`
-- `links-config.js` ↔ the backend seed — `backend/test/link-hub-content.test.ts`
-- every id `js/links.js` writes into ↔ `links.html` — `website/check.mjs`
+**Anti-drift checks.**
 
-`links-config.js` is therefore no longer an authoring surface. Editing it
-changes the offline fallback and a *fresh* database's seed, not what visitors
-currently see.
+- seed ≡ `LINK_HUB_FALLBACK` (deep equality) — `backend/test/link-hub-content.test.ts`
+- fallback destinations, external links, team/social visibility, fallback row
+  counts ↔ `links.html` — `website/check.mjs`
+- every `linkhub-*` id `js/links.js` renders into ↔ `links.html` — `website/check.mjs`
+- `.lh-contact-value` keeps `direction: ltr; unicode-bidi: isolate` — `website/check.mjs`
+- `js/links-model.js` stays pure (so the suite can test real render rules) — `website/check.mjs`
 
-**Preview targets the right page.** `admin/js/cms.js`'s `PREVIEW_TARGETS`
-maps `linkHub` to `/links`; every other section previews against `/`. The
-iframe's `loaded` marker is keyed on the URL so switching pages waits for the
-new document before posting the draft.
+**Preview.** `admin/js/cms.js`'s `PREVIEW_TARGETS` sends `linkHub` to `/links`.
+Once a draft arrives by `postMessage` it wins over the page's own published
+fetch, which may resolve later.
 
 ### `request.html`, `privacy.html`, `terms.html`, `404.html`
 

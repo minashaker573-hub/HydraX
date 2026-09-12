@@ -16,8 +16,30 @@ import { authorizeAdmin } from '../http/auth.ts';
 import { BodyParseError, BodyTooLargeError, readJsonBody, sendError, sendJson } from '../http/respond.ts';
 import { nowIso, type AppDeps } from '../deps.ts';
 import { isSectionId, SECTION_IDS, validateWebsiteSection } from '../domain/website-content.ts';
+import type { SectionId, ValidationContext } from '../domain/website-content.ts';
+import { DEFAULT_WEBSITE_CONTENT } from '../domain/website-content-seed.ts';
 import { log } from '../log.ts';
 import type { Router } from '../http/router.ts';
+
+/**
+ * The cross-section facts a validator needs, read fresh from the database.
+ *
+ * Only the link hub needs any: its contact rows must match the homepage's
+ * canonical contact details. "Canonical" is what the homepage is showing
+ * visitors right now — the PUBLISHED contact row — falling back to its draft,
+ * then to the seed, only when nothing has been published yet (a fresh or
+ * test database). Deliberately not the contact draft first: that would let
+ * /links publish a number the homepage does not yet show.
+ */
+async function validationContext(section: SectionId, deps: AppDeps): Promise<ValidationContext> {
+  if (section !== 'linkHub') return {};
+  const row = (await deps.repo.getWebsiteContent('contact', 'published'))
+    ?? (await deps.repo.getWebsiteContent('contact', 'draft'));
+  const data = (row?.data ?? DEFAULT_WEBSITE_CONTENT.contact) as { email?: unknown; phone?: unknown };
+  const email = typeof data.email === 'string' ? data.email : DEFAULT_WEBSITE_CONTENT.contact.email;
+  const phone = typeof data.phone === 'string' ? data.phone : DEFAULT_WEBSITE_CONTENT.contact.phone;
+  return { canonicalContact: { email, phone } };
+}
 
 export function registerWebsiteContentRoutes(router: Router, deps: AppDeps): void {
   // --------------------------------------------------------------- public --
@@ -82,7 +104,7 @@ export function registerWebsiteContentRoutes(router: Router, deps: AppDeps): voi
       throw error;
     }
 
-    const result = validateWebsiteSection(section, body);
+    const result = validateWebsiteSection(section, body, await validationContext(section, deps));
     if (!result.ok) {
       sendError(ctx.res, 400, 'invalid content', result.errors);
       return;
@@ -113,7 +135,10 @@ export function registerWebsiteContentRoutes(router: Router, deps: AppDeps): voi
       sendError(ctx.res, 404, `${section} has no draft to publish`);
       return;
     }
-    const revalidated = validateWebsiteSection(section, draftRow.data);
+    // Includes the cross-section check: if the homepage's contact details were
+    // changed and published after this draft was saved, publishing it now
+    // would put two different numbers live, so it is refused here too.
+    const revalidated = validateWebsiteSection(section, draftRow.data, await validationContext(section, deps));
     if (!revalidated.ok) {
       sendError(ctx.res, 409, `${section}'s saved draft no longer passes validation`, revalidated.errors);
       return;
