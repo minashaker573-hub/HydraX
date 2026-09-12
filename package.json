@@ -1,0 +1,9 @@
+{
+  "name": "hydrax",
+  "private": true,
+  "description": "HYDRAX deployment root. The backend's own dependencies live in backend/package.json; this file only marks api/ and scripts/ as ES modules and pins the Node version Vercel uses. See docs/DEPLOYMENT.md.",
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  }
+}

@@ -1,37 +1,21 @@
 /**
- * HYDRAX - server entry point.
+ * HYDRAX - server entry point (long-running process, `npm start`).
  *
- * Composition root for the backend: loads config, opens the database, starts
- * the HTTP listener and the background maintenance timers.
+ * Starts the backend via bootstrap.ts, listens, and runs the maintenance jobs
+ * on timers. On Vercel the same backend runs through vercel.ts instead.
  */
 
 import { createServer } from 'node:http';
-import { mkdir } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-import { createApp } from './app.ts';
-import { ConfigError, loadConfig } from './config.ts';
-import { closeDatabase, openDatabase } from './db/index.ts';
-import { Repository } from './db/repository.ts';
-import { sweepOfflineDevices } from './domain/alerts.ts';
-import { DEFAULT_WEBSITE_CONTENT, LINKHUB_SEED_V1 } from './domain/website-content-seed.ts';
-import { SECTION_IDS, upgradeSeededContent } from './domain/website-content.ts';
+import { bootstrap, pruneRetention, sweepOffline } from './bootstrap.ts';
+import { ConfigError } from './config.ts';
+import { closeDatabase } from './db/index.ts';
 import { log } from './log.ts';
-import type { AppDeps } from './deps.ts';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const BACKEND_ROOT = resolve(HERE, '..');
-const PROJECT_ROOT = resolve(BACKEND_ROOT, '..');
 
 async function main(): Promise<void> {
-  let config;
+  let runtime;
   try {
-    config = loadConfig(process.env, {
-      dashboardDir: join(PROJECT_ROOT, 'dashboard'),
-      websiteDir: join(PROJECT_ROOT, 'website'),
-      adminDir: join(PROJECT_ROOT, 'admin'),
-    });
+    runtime = await bootstrap(process.env);
   } catch (error) {
     if (error instanceof ConfigError) {
       log.error('config', error.message);
@@ -39,80 +23,30 @@ async function main(): Promise<void> {
     }
     throw error;
   }
+  const { deps, db, app } = runtime;
+  const { config } = deps;
 
-  if (config.deviceKey === null) {
-    log.warn(
-      'config',
-      'Running with HYDRAX_ALLOW_INSECURE=true: telemetry ingestion is UNAUTHENTICATED. ' +
-        'Do not use this outside local development.',
-    );
-  }
-
-  const db = await openDatabase(config.databaseUrl);
-  const repo = new Repository(db);
-  const deps: AppDeps = { repo, config, now: () => Date.now() };
-
-  // The CMS's uploads directory lives under the website's own static root
-  // (see config.ts's `mediaDir` comment) and must exist before the first
-  // upload, not be created lazily mid-request.
-  await mkdir(config.mediaDir, { recursive: true });
-
-  // Seeds each website content section with the site's real current copy —
-  // a no-op for any section that has already been touched (draft or
-  // published), so this never overwrites a real edit. See
-  // domain/website-content-seed.ts.
-  const seedNow = new Date(Date.now()).toISOString();
-  for (const section of SECTION_IDS) {
-    await repo.seedWebsiteContentIfMissing(section, DEFAULT_WEBSITE_CONTENT[section], seedNow);
-  }
-
-  // The link hub gained fields (the team) after its first release. A database
-  // seeded by that release has rows without them, which the current validator
-  // would refuse to re-save. This fills in missing fields and moves values
-  // that were never edited to the new defaults; any admin edit is kept as-is.
-  // A no-op once the rows are current. See upgradeSeededContent.
-  const linkHubUpgrade = await repo.upgradeWebsiteContent(
-    'linkHub',
-    (stored) => upgradeSeededContent(stored, LINKHUB_SEED_V1, DEFAULT_WEBSITE_CONTENT.linkHub),
-    seedNow,
-  );
-  if (linkHubUpgrade.draft || linkHubUpgrade.published) {
-    log.info(
-      'cms',
-      `linkHub: upgraded stored content to the current schema (draft: ${linkHubUpgrade.draft}, `
-        + `published: ${linkHubUpgrade.published}); admin edits were preserved`,
-    );
-  }
-
-  const server = createServer(createApp(deps));
+  const server = createServer(app);
 
   // --- background maintenance ----------------------------------------------
   // A device that stops reporting must surface as an alert on its own; nobody
   // is watching the dashboard at 3am waiting for a row to go stale.
   const offlineTimer = setInterval(() => {
-    void (async () => {
-      try {
-        await sweepOfflineDevices(repo, config.offlineTimeoutMs, Date.now());
-      } catch (error) {
-        log.error('sweep', `offline sweep failed: ${(error as Error).message}`);
-      }
-    })();
+    void sweepOffline(deps).catch((error: unknown) => {
+      log.error('sweep', `offline sweep failed: ${(error as Error).message}`);
+    });
   }, config.offlineSweepIntervalMs);
   offlineTimer.unref();
 
   let retentionTimer: NodeJS.Timeout | undefined;
   if (config.retentionDays > 0) {
-    const pruneOnce = async (): Promise<void> => {
-      try {
-        const cutoff = new Date(Date.now() - config.retentionDays * 86_400_000).toISOString();
-        const removed = await repo.pruneTelemetryBefore(cutoff);
-        if (removed > 0) log.info('retention', `pruned ${removed} telemetry rows before ${cutoff}`);
-      } catch (error) {
+    const pruneOnce = (): void => {
+      void pruneRetention(deps).catch((error: unknown) => {
         log.error('retention', `prune failed: ${(error as Error).message}`);
-      }
+      });
     };
-    void pruneOnce();
-    retentionTimer = setInterval(() => void pruneOnce(), 6 * 60 * 60 * 1000);
+    pruneOnce();
+    retentionTimer = setInterval(pruneOnce, 6 * 60 * 60 * 1000);
     retentionTimer.unref();
   }
 

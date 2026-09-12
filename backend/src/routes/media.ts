@@ -1,10 +1,11 @@
 /**
  * HYDRAX - CMS media library.
  *
- * Uploads a real file to disk under website/assets/uploads/ (served by the
- * existing static route for the rest of website/assets/ — see
- * config.ts's `mediaDir` comment), records its metadata, and lets the admin
- * list or delete what has been uploaded.
+ * Stores an uploaded image — bytes and metadata — in the database, and lets
+ * the admin list or delete what has been uploaded. The image is served at
+ * /assets/uploads/<filename> by app.ts. Database rather than disk because a
+ * Vercel Function has no writable, persistent filesystem; it also means an
+ * upload survives any redeploy on any host.
  *
  * No multipart parsing: the browser sends the raw file bytes as the request
  * body (see http/upload.ts), with the original filename and alt text as
@@ -13,8 +14,6 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 
 import { authorizeAdmin } from '../http/auth.ts';
 import { sendError, sendJson } from '../http/respond.ts';
@@ -35,7 +34,10 @@ const ALLOWED_TYPES: Record<string, string> = {
   'image/webp': 'webp',
 };
 
-const MAX_UPLOAD_BYTES = 6 * 1024 * 1024; // 6 MB — generous for a real photo, bounded
+/** 4 MB: under Vercel Functions' 4.5 MB request-body ceiling, so an oversized
+ *  upload is refused here with a clear message rather than cut off by the
+ *  platform. Still generous for a resized photo. */
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 function toPublicMedia(row: MediaRow): Record<string, unknown> {
   return {
@@ -74,7 +76,7 @@ export function registerMediaRoutes(router: Router, deps: AppDeps): void {
       bytes = await readRawBody(ctx.req, MAX_UPLOAD_BYTES);
     } catch (error) {
       if (error instanceof BodyTooLargeError) {
-        sendError(ctx.res, 413, error.message);
+        sendError(ctx.res, 413, `${error.message} — images are limited to 4 MB; resize it and try again`);
         return;
       }
       throw error;
@@ -88,13 +90,9 @@ export function registerMediaRoutes(router: Router, deps: AppDeps): void {
     const altText = sanitizeText(headerValue(ctx.req.headers['x-alt-text'])).slice(0, 200);
 
     const filename = `${randomUUID()}.${ext}`;
-    await mkdir(deps.config.mediaDir, { recursive: true });
-    await writeFile(join(deps.config.mediaDir, filename), bytes);
-
-    const now = nowIso(deps);
     const row = await deps.repo.insertMedia(
-      { filename, originalName, contentType, sizeBytes: bytes.length, altText },
-      now,
+      { filename, originalName, contentType, sizeBytes: bytes.length, altText, data: bytes },
+      nowIso(deps),
     );
 
     log.info('cms', `media uploaded: ${filename} (${bytes.length} bytes, from "${originalName}")`);
@@ -129,15 +127,10 @@ export function registerMediaRoutes(router: Router, deps: AppDeps): void {
       return;
     }
 
+    // Deleting the row deletes the stored image. Images from before
+    // in-database storage are static files in the repository; those are left
+    // in place (a deploy is what removes a committed file).
     await deps.repo.deleteMedia(id);
-    try {
-      await unlink(join(deps.config.mediaDir, media.filename));
-    } catch (error) {
-      // The DB row is already gone; a missing file on disk (already deleted,
-      // moved, whatever) is not a reason to report failure for a delete that
-      // otherwise succeeded — just note it for whoever reads the logs.
-      log.warn('cms', `media ${id}: file already missing on disk (${(error as Error).message})`);
-    }
 
     log.info('cms', `media deleted: ${media.filename}`);
     sendJson(ctx.res, 200, { deleted: true });

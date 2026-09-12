@@ -197,3 +197,9 @@ CREATE TABLE IF NOT EXISTS website_media (
     alt_text      TEXT NOT NULL DEFAULT '',
     uploaded_at   TEXT NOT NULL
 );
+
+-- The uploaded file itself. Stored in the database rather than on disk so
+-- uploads survive on hosts with an ephemeral or read-only filesystem (Vercel
+-- Functions). NULL for rows created before this column existed, whose file is
+-- a static asset committed under website/assets/uploads/ instead. Idempotent.
+ALTER TABLE website_media ADD COLUMN IF NOT EXISTS data BYTEA;

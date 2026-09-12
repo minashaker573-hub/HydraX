@@ -1,126 +1,114 @@
-# HYDRAX — Deployment
+# HYDRAX — Deployment (Vercel)
 
-## The shape: website on Vercel, backend on Render, database on Supabase
+## The shape: one Vercel project, one Supabase database
 
+```text
+                ┌──────────────────────────── Vercel project ────────────────────────────┐
+ visitor ──────►│ static (CDN)      /  /links  /request  /privacy  /terms                 │
+                │                   /dashboard   /admin                                   │
+                │                                                                          │
+                │ function          /api/*   /health   /assets/uploads/*  ──► api/index.js ├──► Supabase Postgres
+                │ (api/index.js)                                                           │
+                │ daily cron        /api/cron/maintenance                                  │
+                └──────────────────────────────────────────────────────────────────────────┘
+ ESP32 controllers ───────────────────────── POST /api/v1/telemetry ─────────────────────►
 ```
-                    ┌──────────────────────── Vercel ────────────────────────┐
- visitor ──────────►│ /  /links  /request  /privacy  /terms   (static files) │
-                    │                                                         │
-                    │ /api/*  /admin  /dashboard  /assets/uploads/*  ──proxy──┼──► Render: backend (Node)
-                    └─────────────────────────────────────────────────────────┘          │
-                                                                                         ▼
- ESP32 controllers ─────────────────────────────── /api/v1/telemetry ──────────► Supabase Postgres
-```
 
-**Why not all on Vercel.** The backend is one long-running Node process: two
-`setInterval` background jobs (offline-device sweep, telemetry retention), an
-in-memory rate limiter, and CMS uploads written to disk. Vercel runs
-short-lived functions that are thrown away after each request, so none of that
-survives there. Render runs it exactly as `npm start` does locally.
+- **Static files.** `scripts/vercel-build.mjs` assembles `public/` from
+  `website/` (at `/`), `dashboard/` (at `/dashboard`) and `admin/` (at
+  `/admin`). No bundling — they are already static.
+- **The backend** runs as one Vercel Function, `api/index.js` →
+  `backend/src/vercel.ts`, wrapping the same `createApp()` that `npm start`
+  runs. Every route, validation rule, and header is the same code. The build
+  compiles `backend/src` to `backend/dist` with the project's own TypeScript
+  (`backend/tsconfig.build.json`), and the function imports that output — a
+  type error fails the deploy. Each rewrite carries the original request path
+  in `__hydrax_path`, which the handler restores before routing.
+- **Uploaded images** are stored in Postgres (`website_media.data`) and served
+  at the same `/assets/uploads/<uuid>.jpg` URLs. A Vercel Function has no
+  writable, persistent disk, so this is what makes uploads survive. Images
+  uploaded before this change are committed to the repository and served as
+  static files.
+- **Same origin everywhere**, so the CSP stays `connect-src 'self'` and no
+  CORS is involved.
 
-**Why a proxy instead of CORS.** `website/vercel.json` rewrites `/api/*`,
-`/admin`, `/dashboard` and `/assets/uploads/*` to the backend. The browser only
-ever talks to the Vercel domain, so:
-
-- the website's relative requests (`/api/v1/website-content`, the quote form)
-  work unchanged — no `API_BASE`, no `HYDRAX_ALLOWED_ORIGIN`;
-- the Content-Security-Policy stays `connect-src 'self'`;
-- the admin console and dashboard are reachable on the Vercel domain too, and
-  still directly on the Render domain;
-- the backend URL appears in exactly one file: `website/vercel.json`.
-
-CDN caching is **disabled** on every proxied path
-(`x-vercel-enable-rewrite-caching: 0`), and the backend sends
-`Cache-Control: no-store` on every API response. Admin API responses are
-authenticated by header, so a cached one must never be served to anyone else —
-`website/check.mjs` fails if that header is removed from any proxied path.
+`vercel.json` at the repository root holds all of this; `website/check.mjs`
+fails if its critical parts are removed.
 
 ---
 
-## 1. Backend on Render
+## Deploy
 
-`render.yaml` at the repository root is a Render **Blueprint**: service
-`hydrax-api`, free plan, Node 24, health check `/health/live`, auto-deploy on
-every push.
+1. Sign in at <https://vercel.com> with the GitHub account that owns the
+   repository.
+2. **Add New → Project**, import **HydraX**.
+3. Leave **Root Directory** as the repository root (`./`) and **Framework
+   Preset** as **Other**. Build and install commands come from `vercel.json`;
+   leave those fields empty.
+4. Under **Environment Variables**, add:
 
-1. Sign in at <https://dashboard.render.com> with the GitHub account that owns
-   this repository.
-2. **New → Blueprint**, select the repository. Render reads `render.yaml`.
-3. It asks for the three secrets. Use the same values as your local
-   `backend/.env`:
-   - `HYDRAX_DEVICE_KEY` — the key the controllers send
-   - `HYDRAX_ADMIN_KEY` — the operator key (must differ from the device key)
-   - `HYDRAX_DATABASE_URL` — the Supabase **Session pooler** connection string
-     ([CONFIGURATION.md](CONFIGURATION.md))
-4. **Apply**. The first build takes a few minutes. When it is live, open
-   `https://hydrax-api.onrender.com/health/live` — it should answer `200`.
-5. **Check the URL Render gave you.** If `hydrax-api` was already taken, Render
-   uses a different subdomain. In that case replace
-   `https://hydrax-api.onrender.com` in `website/vercel.json` (every rewrite)
-   with your real URL, run `cd backend && npm run check`, and push.
+   | Name | Value |
+   | --- | --- |
+   | `HYDRAX_DEVICE_KEY` | the key controllers send (same as your local `backend/.env`) |
+   | `HYDRAX_ADMIN_KEY` | the operator key for `/admin` (must differ from the device key) |
+   | `HYDRAX_DATABASE_URL` | the Supabase **Session pooler** connection string ([CONFIGURATION.md](CONFIGURATION.md)) |
+   | `CRON_SECRET` | any long random string — protects the daily maintenance job |
 
-The server binds to Render's `PORT` automatically (`HYDRAX_PORT` still wins if
-set).
-
-## 2. Website on Vercel
-
-1. Sign in at <https://vercel.com> with the same GitHub account.
-2. **Add New → Project**, import the repository.
-3. Settings:
-   - **Root Directory**: `website`
-   - **Framework Preset**: Other
-   - **Build Command**: leave empty · **Output Directory**: leave empty
-4. **Deploy**. Then check, on your Vercel URL:
-   - `/links` shows the team and social accounts (content comes through the proxy)
-   - `/admin` opens the operator console; sign in with `HYDRAX_ADMIN_KEY`
+5. **Deploy**. When it finishes, check on the Vercel URL:
+   - `/health/live` answers `{"status":"ok",…}`, and `/health` reports the database reachable
+   - `/links` shows the team and social accounts
+   - `/admin` signs in with `HYDRAX_ADMIN_KEY`
    - `/dashboard` loads
 
-Every push to `master` redeploys both services.
+Every push to `master` redeploys.
 
 ---
 
-## Known limits of the free tiers
+## How it differs from running `npm start`
 
-- **Render free services sleep after 15 minutes without traffic** and take
-  about a minute to wake. While asleep, `/links` still renders instantly from
-  its built-in fallback, but CMS content — team members, social accounts —
-  appears only once the backend answers. Admin and dashboard wait for it. A
-  controller posting telemetry every 15 s keeps it awake; otherwise Render's
-  paid instance removes the sleep.
-- **Render's free disk is wiped on every restart, redeploy and sleep.** CMS
-  image uploads are written to `website/assets/uploads/` on that disk, so a
-  photo uploaded through the live admin disappears at the next spin-down —
-  the page then shows initials instead. **Photos that must persist are
-  committed to the repository** (they then exist on both Render and Vercel).
-  Durable runtime uploads need either a Render persistent disk (paid plans) or
-  moving media storage to Supabase Storage.
-- **Uploading through the Vercel domain is not verified.** Vercel does not
-  document a body-size or time limit for proxied requests. If an admin photo
-  upload fails on the Vercel URL, use the admin on the Render URL directly:
-  `https://hydrax-api.onrender.com/admin`.
+| Concern | Long-running server | Vercel |
+| --- | --- | --- |
+| Startup (schema, seeding, link hub upgrade) | once at boot | once per function instance, on its first request; retried if it fails |
+| Offline-device alerts | swept every 15 s by a timer | swept (at most every 15 s) right before `GET /api/v1/dashboard` or `/api/v1/alerts` is answered, **plus** once a day by cron |
+| Telemetry retention | pruned every 6 h | pruned once a day by cron |
+| Quote-form rate limit | one in-memory counter | one counter **per function instance** — a weaker speed bump |
+| Uploaded images | database | database |
+
+**Offline alerts on the Hobby plan.** Vercel Hobby allows cron jobs at most
+once a day. A device's *online/offline status* is computed on every read, so
+the dashboard always shows it correctly; what changes is when a
+`DEVICE_OFFLINE` *alert* is created — whenever someone opens the dashboard or
+alerts, or at the daily run. For alerts raised within minutes with nobody
+watching, Vercel Pro allows per-minute cron: change the schedule in
+`vercel.json` (e.g. `"*/1 * * * *"`).
+
+**Upload size.** Vercel Functions accept request bodies up to 4.5 MB, so the
+admin's upload limit is 4 MB. Resize larger photos before uploading.
+
+**Cold starts.** The first request to a new function instance runs startup
+against Supabase, which can take a few seconds. `/links` renders instantly
+from its built-in fallback and fills in team and social content when the API
+answers.
 
 ## Controllers (firmware)
 
-Controllers talk to the backend directly, not through Vercel. Their
-`kBackendBaseUrl` (in the git-ignored `firmware/src/config/secrets.h`) is a
-LAN address today. Render only serves HTTPS, and the firmware's telemetry
-client (`firmware/src/net/telemetry_client.cpp`) uses `HTTPClient` with no
-TLS configuration — **pointing a controller at `https://hydrax-api.onrender.com`
-is untested and must be verified on the bench before relying on it.** The
-controller keeps irrigating either way; only reporting is affected.
+Controllers post telemetry directly to `https://<your-vercel-domain>/api/v1/telemetry`.
+Their `kBackendBaseUrl` (in the git-ignored `firmware/src/config/secrets.h`) is
+a LAN address today. Vercel only serves HTTPS, and the firmware's telemetry
+client (`firmware/src/net/telemetry_client.cpp`) uses `HTTPClient` with no TLS
+configuration — **pointing a controller at the Vercel URL is untested and must
+be verified on the bench first.** Irrigation is unaffected either way; only
+reporting is.
 
 ## The database is shared
 
-The local server and the Render service use the same Supabase database when
-they share `HYDRAX_DATABASE_URL`. Edits made through the local admin appear on
-the live site, and both processes run the background jobs (harmless — both are
-idempotent). Use a separate Supabase project for local experiments if that is
-not wanted.
+The local server and the Vercel deployment use the same Supabase database when
+they share `HYDRAX_DATABASE_URL`: edits in the local admin appear on the live
+site. Use a separate Supabase project for local experiments if that is not
+wanted.
 
----
+## Local development is unchanged
 
-## Alternative: single process on one host
-
-Everything — website, `/links`, admin, dashboard, API — from one Node process,
-no Vercel: follow step 1 only and use the Render URL as the public site. No
-proxy, no second platform. The free-tier limits above apply in the same way.
+`cd backend && npm start` still runs everything — website, `/links`, admin,
+dashboard, API — from one process with timers, exactly as before. Vercel is
+only the deployment target.

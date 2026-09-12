@@ -418,22 +418,23 @@ console.log('\nlink hub:');
 }
 
 /* --- 11. Vercel deployment config ------------------------------------------ */
-// website/vercel.json proxies the backend's routes from Render so the site,
-// /links, admin and dashboard all share one origin (see docs/DEPLOYMENT.md).
-// Three things must stay true, or production breaks in a way no local run
-// would show:
-//   a) it is valid JSON with no leftover placeholder
-//   b) every proxy rewrite targets the SAME https origin — one backend
-//   c) no proxied path may be cached on Vercel's CDN. /api/v1/admin responses
-//      are authenticated by header; a cached one could be served to someone
-//      without the key. The backend sends no-store as well; this is the
-//      second, independent lock.
-//   d) the CSP stays same-origin — the proxy is what makes that possible
+// The whole project deploys as ONE Vercel project (docs/DEPLOYMENT.md): the
+// website, dashboard and admin as static files, and api/index.ts running the
+// backend. The root vercel.json must keep, or production breaks in ways no
+// local run shows:
+//   a) valid JSON with no leftover placeholder
+//   b) no rewrite to an external origin — nothing is proxied off-project
+//   c) /api/*, /health and /assets/uploads/* routed to the backend function
+//   d) the daily maintenance cron (offline sweep + telemetry retention)
+//   e) a same-origin CSP
+//   f) public pages served as static files, never rewritten
+//   g) the build script and function entry it refers to actually exist
 console.log('\nvercel deployment config:');
 {
-  const vercelPath = join(HERE, 'vercel.json');
+  const ROOT = join(HERE, '..');
+  const vercelPath = join(ROOT, 'vercel.json');
   if (!existsSync(vercelPath)) {
-    fail('vercel.json is missing — the Vercel deployment has no rewrites or security headers');
+    fail('vercel.json is missing at the repository root');
   } else {
     const raw = await readFile(vercelPath, 'utf8');
     let cfg = null;
@@ -448,27 +449,31 @@ console.log('\nvercel deployment config:');
       else ok('no placeholder values');
 
       const rewrites = Array.isArray(cfg.rewrites) ? cfg.rewrites : [];
-      const external = rewrites.filter((r) => /^https?:\/\//.test(String(r.destination)));
-      const origins = [...new Set(external.map((r) => new URL(r.destination).origin))];
-      if (origins.length !== 1) {
-        fail(`proxy rewrites must target exactly one backend origin, found: ${origins.join(', ') || 'none'}`);
-      } else if (!origins[0].startsWith('https://')) {
-        fail(`backend origin must be https, got ${origins[0]}`);
-      } else {
-        ok(`${external.length} proxy rewrite(s) all target ${origins[0]}`);
-      }
+      const external = rewrites.filter((r) => /^[a-z]+:\/\//i.test(String(r.destination)));
+      if (external.length) fail(`vercel.json proxies off-project: ${external.map((r) => r.destination).join(', ')}`);
+      else ok('no rewrite leaves the project');
 
-      const REQUIRED = ['/api/:path*', '/admin', '/admin/:path*', '/dashboard', '/dashboard/:path*'];
-      const missing = REQUIRED.filter((src) => !external.some((r) => r.source === src));
-      if (missing.length) fail(`vercel.json does not proxy: ${missing.join(', ')}`);
-      else ok('api, admin and dashboard are proxied to the backend');
+      // Each rewrite must carry the ORIGINAL path in __hydrax_path, which
+      // backend/src/vercel.ts restores before routing — without it every
+      // request could reach the app as plain "/api" and 404.
+      const TO_FUNCTION = [
+        ['/api/(.*)', '/api?__hydrax_path=/api/$1'],
+        ['/health', '/api?__hydrax_path=/health'],
+        ['/health/(.*)', '/api?__hydrax_path=/health/$1'],
+        ['/assets/uploads/(.*)', '/api?__hydrax_path=/assets/uploads/$1'],
+      ];
+      const unrouted = TO_FUNCTION.filter(([src, dest]) => !rewrites.some((r) => r.source === src && r.destination === dest));
+      if (unrouted.length) fail(`not routed to the backend function with its original path: ${unrouted.map(([s]) => s).join(', ')}`);
+      else ok('api, health and uploads reach the backend function with their original path');
 
-      const noCache = new Set((cfg.headers || [])
-        .filter((h) => (h.headers || []).some((x) => x.key.toLowerCase() === 'x-vercel-enable-rewrite-caching' && String(x.value) === '0'))
-        .map((h) => h.source));
-      const cacheable = external.filter((r) => !noCache.has(r.source)).map((r) => r.source);
-      if (cacheable.length) fail(`proxied path(s) could be cached on Vercel's CDN: ${cacheable.join(', ')}`);
-      else ok('CDN caching disabled on every proxied path');
+      const fnConfig = cfg.functions && cfg.functions['api/index.js'];
+      if (!fnConfig) fail('vercel.json has no functions entry for api/index.js');
+      else if (!String(fnConfig.includeFiles || '').includes('backend/dist/db/schema.sql')) fail('the function does not bundle backend/dist/db/schema.sql, which startup reads');
+      else ok('function bundles the compiled backend schema');
+
+      const crons = Array.isArray(cfg.crons) ? cfg.crons : [];
+      if (!crons.some((c) => c.path === '/api/cron/maintenance')) fail('the daily /api/cron/maintenance cron is missing');
+      else ok('daily maintenance cron configured');
 
       const csp = (cfg.headers || []).flatMap((h) => h.headers || [])
         .find((x) => x.key.toLowerCase() === 'content-security-policy');
@@ -477,11 +482,21 @@ console.log('\nvercel deployment config:');
       else if (!connect || connect.trim() !== "'self'") fail(`CSP connect-src must be 'self' only, got "${connect}"`);
       else ok("CSP connect-src is 'self' only");
 
-      // The public pages themselves are static files on Vercel, never proxied.
-      const proxiedPages = external.filter((r) => ['/', '/links', '/request', '/privacy', '/terms'].includes(r.source));
-      if (proxiedPages.length) fail(`public pages must be served by Vercel, not proxied: ${proxiedPages.map((r) => r.source).join(', ')}`);
-      else ok('public pages are served statically by Vercel');
+      const PAGES = ['/', '/links', '/request', '/privacy', '/terms', '/admin', '/dashboard'];
+      const rewrittenPages = rewrites.filter((r) => PAGES.includes(r.source));
+      if (rewrittenPages.length) fail(`pages must be static, not rewritten: ${rewrittenPages.map((r) => r.source).join(', ')}`);
+      else ok('pages are served as static files');
+
+      const needed = [cfg.outputDirectory === 'public' ? null : 'outputDirectory "public"',
+        existsSync(join(ROOT, 'scripts', 'vercel-build.mjs')) ? null : 'scripts/vercel-build.mjs',
+        existsSync(join(ROOT, 'api', 'index.js')) ? null : 'api/index.js',
+        existsSync(join(ROOT, 'backend', 'tsconfig.build.json')) ? null : 'backend/tsconfig.build.json'].filter(Boolean);
+      if (needed.length) fail(`vercel.json refers to something missing: ${needed.join(', ')}`);
+      else ok('build script and function entry exist');
     }
+  }
+  if (existsSync(join(ROOT, 'website', 'vercel.json'))) {
+    fail('website/vercel.json exists — the project deploys from the repository root; a second config would be ignored or conflict');
   }
 }
 

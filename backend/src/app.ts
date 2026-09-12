@@ -95,6 +95,29 @@ export function createApp(deps: AppDeps): RequestListener {
           return;
         }
 
+        // CMS uploads, stored in the database (routes/media.ts). The filename
+        // must have exactly the shape the upload route generates — a UUID and
+        // an allowed extension — before it reaches a query. No row, or a row
+        // from before in-database storage, falls through to the static file.
+        if (method === 'GET' && url.pathname.startsWith('/assets/uploads/')) {
+          const filename = url.pathname.slice('/assets/uploads/'.length);
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:jpg|png|webp)$/.test(filename)) {
+            const file = await deps.repo.getMediaFile(filename);
+            if (file !== undefined) {
+              res.writeHead(200, {
+                'Content-Type': file.contentType,
+                'Content-Length': file.data.length,
+                // A fresh UUID per upload, never reused: the bytes behind a URL
+                // can never change, so browsers and the CDN may keep them.
+                'Cache-Control': 'public, max-age=31536000, immutable',
+                'X-Content-Type-Options': 'nosniff',
+              });
+              res.end(file.data);
+              return;
+            }
+          }
+        }
+
         // Static surfaces. Two roots, because the public site and the operator
         // dashboard have different audiences and are deployed as one process:
         //   /dashboard/**  -> the monitoring app

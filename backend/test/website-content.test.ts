@@ -392,8 +392,17 @@ test('media upload, list, and reference-protected delete all work end to end', a
     assert.equal(upload.status, 201);
     assert.match(upload.body.url, /^\/assets\/uploads\/[a-f0-9-]+\.jpg$/);
 
+    // The image is stored in the database and served back byte for byte —
+    // no filesystem involved, which is what lets uploads survive on Vercel.
+    const served = await fetch(`${harness.baseUrl}${upload.body.url}`);
+    assert.equal(served.status, 200);
+    assert.equal(served.headers.get('content-type'), 'image/jpeg');
+    assert.deepEqual(Buffer.from(await served.arrayBuffer()), TINY_JPEG);
+
     const list = await adminGet(harness, '/api/v1/admin/media');
     assert.ok(list.body.media.some((m: { id: number }) => m.id === upload.body.id));
+    // Listing the library never carries the image bytes.
+    assert.ok(list.body.media.every((m: Record<string, unknown>) => !('data' in m)));
 
     // Reference it from a section, then a delete must be refused.
     const hero = heroPayload();
@@ -409,6 +418,24 @@ test('media upload, list, and reference-protected delete all work end to end', a
     await adminPut(harness, '/api/v1/admin/website-content/hero', heroCleared);
     const allowedDelete = await adminDelete(harness, `/api/v1/admin/media/${upload.body.id}`);
     assert.equal(allowedDelete.status, 200);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('a deleted upload is no longer served, and an upload over 4 MB is refused', async () => {
+  const harness = await startHarness();
+  try {
+    const upload = await adminUpload(harness, '/api/v1/admin/media', TINY_JPEG, 'image/jpeg');
+    assert.equal(upload.status, 201);
+    assert.equal((await adminDelete(harness, `/api/v1/admin/media/${upload.body.id}`)).status, 200);
+    assert.equal((await fetch(`${harness.baseUrl}${upload.body.url}`)).status, 404);
+
+    // Vercel Functions cap request bodies at 4.5 MB; the app refuses first,
+    // with a message, instead of the platform cutting the request off.
+    const tooBig = await adminUpload(harness, '/api/v1/admin/media', Buffer.alloc(4 * 1024 * 1024 + 1), 'image/jpeg');
+    assert.equal(tooBig.status, 413);
+    assert.match(tooBig.body.error, /4 MB/);
   } finally {
     await harness.close();
   }

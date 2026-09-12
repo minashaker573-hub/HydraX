@@ -761,32 +761,56 @@ export class Repository {
   // website media
   // -------------------------------------------------------------------------
 
+  // Media queries name their columns instead of `SELECT *`: `data` holds the
+  // image bytes, and listing the library must never pull megabytes it does
+  // not use. Only getMediaFile reads `data`.
+
   async insertMedia(input: {
     filename: string;
     originalName: string;
     contentType: string;
     sizeBytes: number;
     altText: string;
+    data: Buffer;
   }, now: string): Promise<MediaRow> {
     const result = await this.#query<MediaRow & { id: string }>(
-      `INSERT INTO website_media (filename, original_name, content_type, size_bytes, alt_text, uploaded_at)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [input.filename, input.originalName, input.contentType, input.sizeBytes, input.altText, now],
+      `INSERT INTO website_media (filename, original_name, content_type, size_bytes, alt_text, uploaded_at, data)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, filename, original_name, content_type, size_bytes, alt_text, uploaded_at`,
+      [input.filename, input.originalName, input.contentType, input.sizeBytes, input.altText, now, input.data],
     );
     return toRow(result.rows[0]!);
   }
 
   async listMedia(): Promise<MediaRow[]> {
     const result = await this.#query<MediaRow & { id: string }>(
-      'SELECT * FROM website_media ORDER BY uploaded_at DESC, id DESC',
+      `SELECT id, filename, original_name, content_type, size_bytes, alt_text, uploaded_at
+       FROM website_media ORDER BY uploaded_at DESC, id DESC`,
     );
     return result.rows.map(toRow);
   }
 
   async getMedia(id: number): Promise<MediaRow | undefined> {
-    const result = await this.#query<MediaRow & { id: string }>('SELECT * FROM website_media WHERE id = $1', [id]);
+    const result = await this.#query<MediaRow & { id: string }>(
+      `SELECT id, filename, original_name, content_type, size_bytes, alt_text, uploaded_at
+       FROM website_media WHERE id = $1`,
+      [id],
+    );
     return result.rows[0] === undefined ? undefined : toRow(result.rows[0]);
+  }
+
+  /**
+   * The stored bytes of one uploaded image, by filename — what
+   * /assets/uploads/<filename> serves. Undefined when there is no such row, or
+   * the row predates in-database storage (its file is a committed static asset).
+   */
+  async getMediaFile(filename: string): Promise<{ contentType: string; data: Buffer } | undefined> {
+    const result = await this.#query<{ content_type: string; data: Buffer | null }>(
+      'SELECT content_type, data FROM website_media WHERE filename = $1',
+      [filename],
+    );
+    const row = result.rows[0];
+    return row === undefined || row.data === null ? undefined : { contentType: row.content_type, data: row.data };
   }
 
   async deleteMedia(id: number): Promise<boolean> {
